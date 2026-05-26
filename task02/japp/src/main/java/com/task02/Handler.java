@@ -31,26 +31,39 @@ public class Handler implements RequestHandler<Map<String, Object>, Map<String, 
 
         Map<String, Object> response = new HashMap<>();
 
-        String path = "";
-        String method = "";
-
         try {
-            if (event.get("rawPath") != null) {
-                path = event.get("rawPath").toString();
-            }
 
-            Object rcObj = event.get("requestContext");
-            if (rcObj != null) {
-                Map<String, Object> requestContext = (Map<String, Object>) rcObj;
+            // -------------------------
+            // SAFE PATH PARSING
+            // -------------------------
+            String path = event.get("rawPath") != null
+                    ? event.get("rawPath").toString()
+                    : "";
 
-                Object httpObj = requestContext.get("http");
-                if (httpObj != null) {
-                    Map<String, Object> http = (Map<String, Object>) httpObj;
-                    method = http.get("method").toString();
+            String method = "";
+
+            if (event.get("requestContext") != null) {
+                Map<String, Object> rc =
+                        (Map<String, Object>) event.get("requestContext");
+
+                if (rc.get("http") != null) {
+                    Map<String, Object> http =
+                            (Map<String, Object>) rc.get("http");
+
+                    method = http.get("method") != null
+                            ? http.get("method").toString()
+                            : "";
                 }
             }
 
+            // fallback (just in case)
+            if (method.isEmpty() && event.get("httpMethod") != null) {
+                method = event.get("httpMethod").toString();
+            }
+
+            // -------------------------
             // SUCCESS CASE
+            // -------------------------
             if ("/hello".equals(path) && "GET".equalsIgnoreCase(method)) {
 
                 response.put("statusCode", 200);
@@ -58,11 +71,13 @@ public class Handler implements RequestHandler<Map<String, Object>, Map<String, 
                 return response;
             }
 
-            // ERROR CASE (REQUIRED FORMAT EXACT)
+            // -------------------------
+            // ERROR CASE (STRICT FORMAT)
+            // -------------------------
             response.put("statusCode", 400);
             response.put("message",
-                "Bad request syntax or unsupported method. Request path: "
-                + path + ". HTTP method: " + method
+                    "Bad request syntax or unsupported method. Request path: "
+                            + path + ". HTTP method: " + method
             );
 
             return response;
@@ -71,8 +86,7 @@ public class Handler implements RequestHandler<Map<String, Object>, Map<String, 
 
             response.put("statusCode", 400);
             response.put("message",
-                "Bad request syntax or unsupported method. Request path: "
-                + path + ". HTTP method: " + method
+                    "Bad request syntax or unsupported method. Request path: . HTTP method: "
             );
 
             return response;
