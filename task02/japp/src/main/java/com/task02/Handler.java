@@ -41,19 +41,19 @@ public class Handler implements RequestHandler<Map<String, Object>, Map<String, 
             if ("/hello".equals(path) && "GET".equalsIgnoreCase(method)) {
 
                 response.put("statusCode", 200);
-                response.put("body", "Hello from Lambda");
+                response.put("message", "Hello from Lambda");
                 return response;
             }
 
             response.put("statusCode", 400);
-            response.put("body",
+            response.put("message",
                     "Bad Request. Path: " + path + ", Method: " + method);
 
             return response;
 
         } catch (Exception e) {
             response.put("statusCode", 400);
-            response.put("body", "Bad Request");
+            response.put("message", "Bad Request");
             return response;
         }
     }
