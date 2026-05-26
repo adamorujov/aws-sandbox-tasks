@@ -29,67 +29,37 @@ public class Handler implements RequestHandler<Map<String, Object>, Map<String, 
     @Override
     public Map<String, Object> handleRequest(Map<String, Object> event, Context context) {
 
-        Map<String, Object> response = new HashMap<>();
+        Map<String, Object> result = new HashMap<>();
 
+        // PATH oxu
+        String path = event.get("rawPath") != null
+                ? event.get("rawPath").toString()
+                : "";
+
+        // METHOD oxu
+        String method = "";
         try {
-
-            // -------------------------
-            // SAFE PATH PARSING
-            // -------------------------
-            String path = event.get("rawPath") != null
-                    ? event.get("rawPath").toString()
-                    : "";
-
-            String method = "";
-
-            if (event.get("requestContext") != null) {
-                Map<String, Object> rc =
-                        (Map<String, Object>) event.get("requestContext");
-
-                if (rc.get("http") != null) {
-                    Map<String, Object> http =
-                            (Map<String, Object>) rc.get("http");
-
-                    method = http.get("method") != null
-                            ? http.get("method").toString()
-                            : "";
+            Map<String, Object> rc = (Map<String, Object>) event.get("requestContext");
+            if (rc != null) {
+                Map<String, Object> http = (Map<String, Object>) rc.get("http");
+                if (http != null && http.get("method") != null) {
+                    method = http.get("method").toString();
                 }
             }
+        } catch (Exception ignored) {}
 
-            // fallback (just in case)
-            if (method.isEmpty() && event.get("httpMethod") != null) {
-                method = event.get("httpMethod").toString();
-            }
-
-            // -------------------------
-            // SUCCESS CASE
-            // -------------------------
-            if ("/hello".equals(path) && "GET".equalsIgnoreCase(method)) {
-
-                response.put("statusCode", 200);
-                response.put("message", "Hello from Lambda");
-                return response;
-            }
-
-            // -------------------------
-            // ERROR CASE (STRICT FORMAT)
-            // -------------------------
-            response.put("statusCode", 400);
-            response.put("message",
-                    "Bad request syntax or unsupported method. Request path: "
-                            + path + ". HTTP method: " + method
-            );
-
-            return response;
-
-        } catch (Exception e) {
-
-            response.put("statusCode", 400);
-            response.put("message",
-                    "Bad request syntax or unsupported method. Request path: . HTTP method: "
-            );
-
-            return response;
+        // SUCCESS CASE
+        if ("/hello".equals(path) && "GET".equalsIgnoreCase(method)) {
+            result.put("statusCode", 200);
+            result.put("message", "Hello from Lambda");
+            return result;
         }
+
+        // ERROR CASE
+        result.put("statusCode", 400);
+        result.put("message",
+                "Bad request syntax or unsupported method. Request path: "
+                        + path + ". HTTP method: " + method);
+        return result;
     }
 }
