@@ -24,7 +24,7 @@ import com.syndicate.deployment.model.lambda.url.InvokeMode;
     authType = AuthType.NONE,
     invokeMode = InvokeMode.BUFFERED
 )
-public class Handler implements RequestHandler<Map<String, Object>, Map<String, Object>> {
+public class HelloWorld implements RequestHandler<Map<String, Object>, Map<String, Object>> {
 
     @Override
     public Map<String, Object> handleRequest(Map<String, Object> event, Context context) {
