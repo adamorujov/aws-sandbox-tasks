@@ -31,13 +31,26 @@ public class Handler implements RequestHandler<Map<String, Object>, Map<String, 
 
         Map<String, Object> response = new HashMap<>();
 
+        String path = "";
+        String method = "";
+
         try {
-            String path = (String) event.get("rawPath");
+            if (event.get("rawPath") != null) {
+                path = event.get("rawPath").toString();
+            }
 
-            Map<String, Object> requestContext = (Map<String, Object>) event.get("requestContext");
-            Map<String, Object> http = (Map<String, Object>) requestContext.get("http");
-            String method = (String) http.get("method");
+            Object rcObj = event.get("requestContext");
+            if (rcObj != null) {
+                Map<String, Object> requestContext = (Map<String, Object>) rcObj;
 
+                Object httpObj = requestContext.get("http");
+                if (httpObj != null) {
+                    Map<String, Object> http = (Map<String, Object>) httpObj;
+                    method = http.get("method").toString();
+                }
+            }
+
+            // SUCCESS CASE
             if ("/hello".equals(path) && "GET".equalsIgnoreCase(method)) {
 
                 response.put("statusCode", 200);
@@ -45,15 +58,23 @@ public class Handler implements RequestHandler<Map<String, Object>, Map<String, 
                 return response;
             }
 
+            // ERROR CASE (REQUIRED FORMAT EXACT)
             response.put("statusCode", 400);
             response.put("message",
-                    "Bad Request. Path: " + path + ", Method: " + method);
+                "Bad request syntax or unsupported method. Request path: "
+                + path + ". HTTP method: " + method
+            );
 
             return response;
 
         } catch (Exception e) {
+
             response.put("statusCode", 400);
-            response.put("message", "Bad Request");
+            response.put("message",
+                "Bad request syntax or unsupported method. Request path: "
+                + path + ". HTTP method: " + method
+            );
+
             return response;
         }
     }
