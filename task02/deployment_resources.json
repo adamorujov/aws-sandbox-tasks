@@ -25,7 +25,6 @@
     "resource_type": "iam_policy",
     "tags": {}
   },
-
   "hello_world-role": {
     "predefined_policies": [],
     "principal_service": "lambda",
