@@ -31,35 +31,58 @@ public class Handler implements RequestHandler<Map<String, Object>, Map<String, 
 
         Map<String, Object> result = new HashMap<>();
 
-        // PATH oxu
-        String path = event.get("rawPath") != null
-                ? event.get("rawPath").toString()
-                : "";
-
-        // METHOD oxu
-        String method = "";
         try {
-            Map<String, Object> rc = (Map<String, Object>) event.get("requestContext");
-            if (rc != null) {
-                Map<String, Object> http = (Map<String, Object>) rc.get("http");
-                if (http != null && http.get("method") != null) {
-                    method = http.get("method").toString();
+
+            String path = "";
+            String method = "";
+
+            if (event.get("rawPath") != null) {
+                path = event.get("rawPath").toString();
+            } else if (event.get("path") != null) {
+                path = event.get("path").toString();
+            }
+
+            Object rcObj = event.get("requestContext");
+            if (rcObj instanceof Map) {
+                Map<String, Object> rc = (Map<String, Object>) rcObj;
+
+                Object httpObj = rc.get("http");
+                if (httpObj instanceof Map) {
+                    Map<String, Object> http = (Map<String, Object>) httpObj;
+
+                    if (http.get("method") != null) {
+                        method = http.get("method").toString();
+                    }
                 }
             }
-        } catch (Exception ignored) {}
 
-        // SUCCESS CASE
-        if ("/hello".equals(path) && "GET".equalsIgnoreCase(method)) {
-            result.put("statusCode", 200);
-            result.put("message", "Hello from Lambda");
+            if (method.isEmpty() && event.get("httpMethod") != null) {
+                method = event.get("httpMethod").toString();
+            }
+
+            // SUCCESS
+            if ("/hello".equals(path) && "GET".equalsIgnoreCase(method)) {
+                result.put("statusCode", 200);
+                result.put("message", "Hello from Lambda");
+                return result;
+            }
+
+            // ERROR
+            result.put("statusCode", 400);
+            result.put("message",
+                    "Bad request syntax or unsupported method. Request path: "
+                            + path + ". HTTP method: " + method
+            );
+
+            return result;
+
+        } catch (Exception e) {
+
+            // IMPORTANT: NEVER RETURN EMPTY
+            result.put("statusCode", 400);
+            result.put("message", "Bad request syntax or unsupported method. Request path: . HTTP method: ");
+
             return result;
         }
-
-        // ERROR CASE
-        result.put("statusCode", 400);
-        result.put("message",
-                "Bad request syntax or unsupported method. Request path: "
-                        + path + ". HTTP method: " + method);
-        return result;
     }
 }
