@@ -8,19 +8,14 @@ type Query {
 }
 
 type Mutation {
-  createEvent(userId: Int!, payLoad: AWSJSON!): EventResult
+  createEvent(userId: Int!, payLoad: AWSJSON!): Event
 }
 
 type Event {
   id: ID!
-  userId: Int!
-  createdAt: AWSDateTime!
+  userId: Int
+  createdAt: String
   payLoad: PayLoad
-}
-
-type EventResult {
-  id: ID!
-  createdAt: AWSDateTime!
 }
 
 type PayLoad {

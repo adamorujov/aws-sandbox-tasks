@@ -38,34 +38,14 @@
     "autoscaling": [],
     "tags": {}
   },
-  "appsync-dynamodb-policy": {
-    "resource_type": "iam_policy",
-    "policy_content": {
-      "Version": "2012-10-17",
-      "Statement": [
-        {
-          "Effect": "Allow",
-          "Action": [
-            "dynamodb:PutItem",
-            "dynamodb:GetItem",
-            "dynamodb:UpdateItem",
-            "dynamodb:DeleteItem",
-            "dynamodb:Query",
-            "dynamodb:Scan"
-          ],
-          "Resource": "*"
-        }
-      ]
-    }
-  },
-  "appsync-dynamodb-role": {
+  "appsync_role": {
     "resource_type": "iam_role",
     "principal_service": "appsync",
-    "predefined_policies": [],
-    "custom_policies": [
-      "appsync-dynamodb-policy"
+    "predefined_policies": [
+        "lambda-basic-execution"
     ],
-    "allowed_accounts": [],
+    "custom_policies": [],
+    "allowed_accounts": ["${account_id}"],
     "instance_profile": false,
     "permissions_boundary": "",
     "tags": {}
@@ -73,36 +53,35 @@
   "GraphQL_API": {
     "resource_type": "appsync",
     "primary_auth_type": "API_KEY",
-    "schema_path": "schema.graphql",
-    "deployment_package": "task07.zip",
+    "api_key_expiration_days": 365,
+    "schema_path": "graphql_schema.graphql",
+    "deployment_package": "GraphQL_API.zip",
     "data_sources": [
-      {
-        "name": "EventsDataSource",
-        "type": "AMAZON_DYNAMODB",
-        "dynamodb_config": {
-          "table_name": "Events",
-          "aws_region": "us-east-1",
-          "use_caller_credentials": false,
-          "versioned": false
-        },
-        "service_role_name": "appsync-dynamodb-role"
-      }
+        {
+            "name": "EventsTableDataSource",
+            "type": "AMAZON_DYNAMODB",
+            "service_role_name": "appsync_role",
+            "dynamodb_config": {
+                "table_name": "Events",
+                "aws_region": "${region}"
+            }
+        }
     ],
     "resolvers": [
-      {
-        "type_name": "Mutation",
-        "field_name": "createEvent",
-        "data_source_name": "EventsDataSource",
-        "runtime": "APPSYNC_JS",
-        "code_path": "createEventResolver.js"
-      },
-      {
-        "type_name": "Query",
-        "field_name": "getEvent",
-        "data_source_name": "EventsDataSource",
-        "runtime": "APPSYNC_JS",
-        "code_path": "getEventResolver.js"
-      }
+        {
+            "type_name": "Mutation",
+            "field_name": "createEvent",
+            "runtime": "APPSYNC_JS",
+            "data_source_name": "EventsTableDataSource",
+            "code_path": "resolvers/createEvent.js"
+        },
+        {
+            "type_name": "Query",
+            "field_name": "getEvent",
+            "runtime": "APPSYNC_JS",
+            "data_source_name": "EventsTableDataSource",
+            "code_path": "resolvers/getEvent.js"
+        }
     ]
   }
 }
