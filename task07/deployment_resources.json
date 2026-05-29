@@ -54,7 +54,7 @@
     "resource_type": "appsync",
     "primary_auth_type": "API_KEY",
     "api_key_expiration_days": 365,
-    "schema_path": "graphql_schema.graphql",
+    "schema": "type Event {\n  id: ID!\n  userId: String!\n  createdAt: String!\n  payLoad: AWSJSON\n}\n\ntype Query {\n  getEvent(id: ID!): Event\n}\n\ntype Mutation {\n  createEvent(userId: String!, payLoad: AWSJSON): Event\n}\n\nschema {\n  query: Query\n  mutation: Mutation\n}",
     "data_sources": [
         {
             "name": "EventsTableDataSource",
