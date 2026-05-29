@@ -5,5 +5,15 @@ export function request(ctx) {
 }
 
 export function response(ctx) {
-    return ctx.result;
+    if (ctx.error) {
+        util.error(ctx.error.message, ctx.error.type);
+    }
+    
+    const result = ctx.result;
+    
+    if (result && result.payLoad && typeof result.payLoad === 'string') {
+        result.payLoad = JSON.parse(result.payLoad);
+    }
+    
+    return result;
 }
