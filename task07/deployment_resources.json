@@ -32,57 +32,20 @@
     "billing_mode": "PAY_PER_REQUEST",
     "read_capacity": 1,
     "write_capacity": 1,
-    "max_read_capacity": 1,
-    "max_write_capacity": 1,
     "global_indexes": [],
     "autoscaling": [],
     "tags": {}
   },
-  "appsync_role": {
+  "appsync_dynamodb_role": {
     "resource_type": "iam_role",
     "principal_service": "appsync",
     "predefined_policies": [
-        "lambda-basic-execution"
+      "AmazonDynamoDBFullAccess"
     ],
     "custom_policies": [],
-    "allowed_accounts": ["${account_id}"],
+    "allowed_accounts": [],
     "instance_profile": false,
     "permissions_boundary": "",
-    "tags": {}
-  },
-  "GraphQL_API": {
-    "resource_type": "appsync",
-    "primary_auth_type": "API_KEY",
-    "api_key_expiration_days": 365,
-    "schema_path": "graphql_schema.graphql",
-    "deployment_package": "GraphQL_API.zip",
-    "data_sources": [
-        {
-            "name": "EventsTableDataSource",
-            "type": "AMAZON_DYNAMODB",
-            "service_role_name": "appsync_role",
-            "dynamodb_config": {
-                "table_name": "Events",
-                "aws_region": "eu-west-1"
-            }
-        }
-    ],
-    "resolvers": [
-        {
-            "type_name": "Mutation",
-            "field_name": "createEvent",
-            "runtime": "APPSYNC_JS",
-            "data_source_name": "EventsTableDataSource",
-            "code_path": "resolvers/createEvent.js"
-        },
-        {
-            "type_name": "Query",
-            "field_name": "getEvent",
-            "runtime": "APPSYNC_JS",
-            "data_source_name": "EventsTableDataSource",
-            "code_path": "resolvers/getEvent.js"
-        }
-    ],
     "tags": {}
   }
 }

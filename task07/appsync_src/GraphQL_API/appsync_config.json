@@ -1,0 +1,45 @@
+{
+  "name": "GraphQL_API",
+  "resource_type": "appsync",
+  "primary_auth_type": "API_KEY",
+  "api_key_expiration_days": 365,
+  "schema_path": "schema.graphql",
+  "data_sources": [
+    {
+      "name": "events_db",
+      "type": "AMAZON_DYNAMODB",
+      "service_role_name": "appsync_dynamodb_role",
+      "dynamodb_config": {
+        "table_name": "Events",
+        "aws_region": "eu-west-1"
+      }
+    }
+  ],
+  "resolvers": [
+    {
+      "kind": "UNIT",
+      "type_name": "Mutation",
+      "field_name": "createEvent",
+      "data_source_name": "events_db",
+      "runtime": "JS",
+      "code_path": "resolvers/mutation/createevent/code.js"
+    },
+    {
+      "kind": "UNIT",
+      "type_name": "Query",
+      "field_name": "getEvent",
+      "data_source_name": "events_db",
+      "runtime": "JS",
+      "code_path": "resolvers/query/getevent/code.js"
+    }
+  ],
+  "functions": [],
+  "log_config": {
+    "logging_enabled": false,
+    "field_log_level": "ERROR",
+    "cloud_watch_logs_role_name": "",
+    "exclude_verbose_content": false
+  },
+  "tags": {},
+  "deployment_package": "appsync_GraphQL_API.zip"
+}
