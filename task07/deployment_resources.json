@@ -73,14 +73,14 @@
             "field_name": "createEvent",
             "runtime": "APPSYNC_JS",
             "data_source_name": "EventsTableDataSource",
-            "code": "import { util } from '@aws-appsync/utils';\nimport { put } from '@aws-appsync/utils/dynamodb';\nexport function request(ctx) {\n  const id = util.autoId();\n  const createdAt = util.time.nowISO8601();\n  return put({\n    key: { id },\n    item: {\n      userId: ctx.arguments.userId,\n      createdAt: createdAt,\n      payLoad: ctx.arguments.payLoad\n    }\n  });\n}\nexport function response(ctx) {\n  if (ctx.error) { util.error(ctx.error.message, ctx.error.type); }\n  return ctx.result;\n}"
+            "code_path": "resolvers/createEvent.js"
         },
         {
             "type_name": "Query",
             "field_name": "getEvent",
             "runtime": "APPSYNC_JS",
             "data_source_name": "EventsTableDataSource",
-            "code": "import { util } from '@aws-appsync/utils';\nimport { get } from '@aws-appsync/utils/dynamodb';\nexport function request(ctx) {\n  return get({ key: { id: ctx.arguments.id } });\n}\nexport function response(ctx) {\n  if (ctx.error) { util.error(ctx.error.message, ctx.error.type); }\n  return ctx.result;\n}"
+            "code_path": "resolvers/getEvent.js"
         }
     ],
     "tags": {}
