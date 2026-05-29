@@ -54,7 +54,8 @@
     "resource_type": "appsync",
     "primary_auth_type": "API_KEY",
     "api_key_expiration_days": 365,
-    "schema": "type Event {\n  id: ID!\n  userId: String!\n  createdAt: String!\n  payLoad: AWSJSON\n}\n\ntype Query {\n  getEvent(id: ID!): Event\n}\n\ntype Mutation {\n  createEvent(userId: String!, payLoad: AWSJSON): Event\n}\n\nschema {\n  query: Query\n  mutation: Mutation\n}",
+    "schema_path": "graphql_schema.graphql",
+    "deployment_package": "GraphQL_API.zip",
     "data_sources": [
         {
             "name": "EventsTableDataSource",
@@ -81,6 +82,7 @@
             "data_source_name": "EventsTableDataSource",
             "code": "import { util } from '@aws-appsync/utils';\nimport { get } from '@aws-appsync/utils/dynamodb';\nexport function request(ctx) {\n  return get({ key: { id: ctx.arguments.id } });\n}\nexport function response(ctx) {\n  if (ctx.error) { util.error(ctx.error.message, ctx.error.type); }\n  return ctx.result;\n}"
         }
-    ]
+    ],
+    "tags": {}
   }
 }
