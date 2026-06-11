@@ -4,42 +4,31 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.stream.Collectors;
 
 public class OpenMeteoClient {
 
     private static final String BASE_URL = "https://api.open-meteo.com/v1/forecast";
 
-    public String getWeatherForecast() {
-        return getWeatherForecast(50.4375, 30.5);
-    }
+    public String getWeatherForecast() throws Exception {
+        String urlString = BASE_URL
+                + "?latitude=50.4375"
+                + "&longitude=30.5"
+                + "&current=temperature_2m,wind_speed_10m"
+                + "&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m"
+                + "&timezone=Europe%2FKiev";
 
-    public String getWeatherForecast(double latitude, double longitude) {
-        try {
-            String urlString = BASE_URL
-                    + "?latitude=" + latitude
-                    + "&longitude=" + longitude
-                    + "&current=temperature_2m,wind_speed_10m"
-                    + "&hourly=temperature_2m,relative_humidity_2m,wind_speed_10m"
-                    + "&timezone=Europe%2FKiev";
+        URL url = new URL(urlString);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.setConnectTimeout(5000);
+        connection.setReadTimeout(5000);
 
-            URL url = new URL(urlString);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setConnectTimeout(5000);
-            conn.setReadTimeout(5000);
-
-            BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(conn.getInputStream()));
-            StringBuilder response = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                response.append(line);
-            }
-            reader.close();
-            return response.toString();
-
-        } catch (Exception e) {
-            return "{\"error\": \"" + e.getMessage() + "\"}";
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(connection.getInputStream()))) {
+            return reader.lines().collect(Collectors.joining());
+        } finally {
+            connection.disconnect();
         }
     }
 }
