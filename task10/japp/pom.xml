@@ -45,11 +45,11 @@
             <version>2.14.0</version>
         </dependency>
 
-        <!-- AWS DynamoDB SDK -->
+       <!-- AWS DynamoDB SDK v1 -->
         <dependency>
-            <groupId>software.amazon.awssdk</groupId>
-            <artifactId>dynamodb</artifactId>
-            <version>2.20.0</version>
+            <groupId>com.amazonaws</groupId>
+            <artifactId>aws-java-sdk-dynamodb</artifactId>
+            <version>1.12.261</version>
         </dependency>
 
         <dependency>
