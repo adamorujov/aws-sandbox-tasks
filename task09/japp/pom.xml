@@ -19,25 +19,13 @@
     </properties>
 
     <dependencies>
-        <!-- AWS Lambda Core -->
+        <!-- AWS dependencies-->
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-lambda-java-core</artifactId>
-            <version>1.2.2</version>
+            <version>1.2.0</version>
         </dependency>
-        <!-- AWS Lambda Events -->
-        <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-lambda-java-events</artifactId>
-            <version>3.11.1</version>
-        </dependency>
-        <!-- Gson - JSON processing -->
-        <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-            <version>2.10.1</version>
-        </dependency>
-        <!-- Syndicate annotations -->
+        <!--Syndicate annotations-->
         <dependency>
             <groupId>net.sf.aws-syndicate</groupId>
             <artifactId>deployment-configuration-annotations</artifactId>
@@ -51,7 +39,7 @@
             <resource>
                 <directory>${resources.dir}</directory>
             </resource>
-        </resources>
+        </resources>        
         <plugins>
             <plugin>
                 <groupId>net.sf.aws-syndicate</groupId>
@@ -59,6 +47,7 @@
                 <version>${syndicate.java.plugin.version}</version>
                 <configuration>
                     <packages>
+                        <!--packages to scan-->
                         <package>com.task09</package>
                     </packages>
                     <fileName>${project.name}-${project.version}.jar</fileName>
@@ -100,15 +89,6 @@
                         </goals>
                     </execution>
                 </executions>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.6.0</version>
-                <configuration>
-                    <finalName>sdk_layer</finalName>
-                    <appendAssemblyId>false</appendAssemblyId>
-                </configuration>
             </plugin>
         </plugins>
     </build>
