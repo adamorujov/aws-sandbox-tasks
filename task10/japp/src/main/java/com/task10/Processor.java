@@ -31,6 +31,7 @@ import com.syndicate.deployment.model.lambda.url.InvokeMode;
     roleName = "processor-role",
     tracingMode = TracingMode.Active,
     aliasName = "${lambdas_alias_name}"
+
 )
 @LambdaUrlConfig(
     authType = AuthType.NONE,
