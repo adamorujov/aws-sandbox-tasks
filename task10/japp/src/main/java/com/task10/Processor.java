@@ -14,10 +14,11 @@ import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.model.AttributeValue;
 import com.amazonaws.services.dynamodbv2.model.PutItemRequest;
 import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.LambdaLogger;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
-import com.amazonaws.xray.AWSXRay;
-import com.amazonaws.xray.entities.Subsegment;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.syndicate.deployment.annotations.environment.EnvironmentVariable;
+import com.syndicate.deployment.annotations.environment.EnvironmentVariables;
 import com.syndicate.deployment.annotations.lambda.LambdaHandler;
 import com.syndicate.deployment.annotations.lambda.LambdaUrlConfig;
 import com.syndicate.deployment.annotations.resources.DependsOn;
@@ -31,71 +32,80 @@ import com.syndicate.deployment.model.lambda.url.InvokeMode;
     roleName = "processor-role",
     tracingMode = TracingMode.Active,
     aliasName = "${lambdas_alias_name}"
-
 )
 @LambdaUrlConfig(
     authType = AuthType.NONE,
     invokeMode = InvokeMode.BUFFERED
 )
 @DependsOn(name = "Weather", resourceType = ResourceType.DYNAMODB_TABLE)
+@EnvironmentVariables(value = {
+    @EnvironmentVariable(key = "target_table", value = "${target_table}")
+})
 public class Processor implements RequestHandler<Object, Map<String, Object>> {
 
-    private static final String WEATHER_URL = "https://api.open-meteo.com/v1/forecast?latitude=50.4375&longitude=30.5&hourly=temperature_2m&timezone=Europe%2FKiev";
-    private static final String TABLE_NAME = System.getenv("target_table");
+    private static final String WEATHER_URL = 
+        "https://api.open-meteo.com/v1/forecast?latitude=50.4375&longitude=30.5&hourly=temperature_2m&timezone=Europe%2FKiev";
 
     private final AmazonDynamoDB dynamoDbClient = AmazonDynamoDBClientBuilder
-            .standard()
-            .withRegion("eu-west-1")
-            .build();
+            .defaultClient();
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
     public Map<String, Object> handleRequest(Object request, Context context) {
+        LambdaLogger logger = context.getLogger();
+
         try {
-            // X-Ray subsegment - API call
-            Subsegment apiSubsegment = AWSXRay.beginSubsegment("OpenMeteoAPICall");
-            String weatherJson;
-            try {
-                HttpRequest httpRequest = HttpRequest.newBuilder()
-                        .uri(URI.create(WEATHER_URL))
-                        .GET()
-                        .build();
-                HttpResponse<String> response = httpClient.send(
-                        httpRequest,
-                        HttpResponse.BodyHandlers.ofString()
-                );
-                weatherJson = response.body();
-            } finally {
-                AWSXRay.endSubsegment();
+            // Resolve table name
+            String tableName = System.getenv("target_table");
+            logger.log("Target table: " + tableName);
+
+            if (tableName == null || tableName.isEmpty()) {
+                throw new RuntimeException("Environment variable 'target_table' is not set!");
             }
 
-            // JSON-u Map-ə çevir
+            // Call Open-Meteo API
+            logger.log("Calling Open-Meteo API...");
+            HttpRequest httpRequest = HttpRequest.newBuilder()
+                    .uri(URI.create(WEATHER_URL))
+                    .GET()
+                    .build();
+            HttpResponse<String> httpResponse = httpClient.send(
+                    httpRequest,
+                    HttpResponse.BodyHandlers.ofString()
+            );
+            String weatherJson = httpResponse.body();
+            logger.log("API response status: " + httpResponse.statusCode());
+            logger.log("API response body (first 500 chars): " + 
+                weatherJson.substring(0, Math.min(500, weatherJson.length())));
+
+            // Parse JSON to Map
             Map<String, Object> forecastMap = objectMapper.readValue(weatherJson, Map.class);
 
-            // X-Ray subsegment - DynamoDB
-            Subsegment dbSubsegment = AWSXRay.beginSubsegment("DynamoDBPutItem");
-            try {
-                Map<String, AttributeValue> item = new HashMap<>();
-                item.put("id", new AttributeValue(UUID.randomUUID().toString()));
-                item.put("forecast", convertToAttributeValue(forecastMap));
+            // Write to DynamoDB
+            String id = UUID.randomUUID().toString();
+            logger.log("Generated ID: " + id);
 
-                PutItemRequest putItemRequest = new PutItemRequest()
-                        .withTableName(TABLE_NAME)
-                        .withItem(item);
+            Map<String, AttributeValue> item = new HashMap<>();
+            item.put("id", new AttributeValue(id));
+            item.put("forecast", convertToAttributeValue(forecastMap));
 
-                dynamoDbClient.putItem(putItemRequest);
-            } finally {
-                AWSXRay.endSubsegment();
-            }
+            PutItemRequest putItemRequest = new PutItemRequest()
+                    .withTableName(tableName)
+                    .withItem(item);
+
+            dynamoDbClient.putItem(putItemRequest);
+            logger.log("Successfully saved item with id: " + id);
 
             Map<String, Object> response = new HashMap<>();
             response.put("statusCode", 200);
-            response.put("body", "Weather data saved successfully!");
+            response.put("body", "Weather data saved successfully! ID: " + id);
             return response;
 
         } catch (Exception e) {
+            logger.log("ERROR: " + e.getMessage());
+            e.printStackTrace();
             throw new RuntimeException("Error: " + e.getMessage(), e);
         }
     }
