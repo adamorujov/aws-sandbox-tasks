@@ -25,19 +25,20 @@ public class DatabaseUtil {
                     return cachedConnection;
                 }
             } catch (SQLException e) {
-                // Connection artıq işləmir
             }
         }
 
         if (cachedEndpoint == null) {
-            cachedEndpoint = System.getenv("DB_ENDPOINT");
+            cachedEndpoint = System.getenv("DB_HOST");
         }
 
         if (cachedUsername == null || cachedPassword == null) {
             loadCredentials();
         }
 
-        String url = "jdbc:postgresql://" + cachedEndpoint + ":5432/logisticdb";
+        String dbName = System.getenv("DB_NAME");
+        String port = System.getenv("DB_PORT");
+        String url = "jdbc:postgresql://" + cachedEndpoint + ":" + port + "/" + dbName;
 
         try {
             Class.forName("org.postgresql.Driver");
@@ -52,14 +53,16 @@ public class DatabaseUtil {
 
     public static Connection getNewConnection() throws Exception {
         if (cachedEndpoint == null) {
-            cachedEndpoint = System.getenv("DB_ENDPOINT");
+            cachedEndpoint = System.getenv("DB_HOST");
         }
 
         if (cachedUsername == null || cachedPassword == null) {
             loadCredentials();
         }
 
-        String url = "jdbc:postgresql://" + cachedEndpoint + ":5432/logisticdb";
+        String dbName = System.getenv("DB_NAME");
+        String port = System.getenv("DB_PORT");
+        String url = "jdbc:postgresql://" + cachedEndpoint + ":" + port + "/" + dbName;
 
         try {
             Class.forName("org.postgresql.Driver");

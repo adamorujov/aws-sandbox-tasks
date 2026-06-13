@@ -27,8 +27,11 @@ import com.google.gson.JsonParser;
 import com.syndicate.deployment.annotations.environment.EnvironmentVariable;
 import com.syndicate.deployment.annotations.environment.EnvironmentVariables;
 import com.syndicate.deployment.annotations.lambda.LambdaHandler;
+import com.syndicate.deployment.annotations.lambda.LambdaUrlConfig;
 import com.syndicate.deployment.model.DeploymentRuntime;
 import com.syndicate.deployment.model.RetentionSetting;
+import com.syndicate.deployment.model.lambda.url.AuthType;
+import com.syndicate.deployment.model.lambda.url.InvokeMode;
 
 @LambdaHandler(
         lambdaName = "api_handler",
@@ -40,8 +43,13 @@ import com.syndicate.deployment.model.RetentionSetting;
         timeout = 120,
         memory = 512
 )
+@LambdaUrlConfig(
+        authType = AuthType.NONE,
+        invokeMode = InvokeMode.BUFFERED
+)
 @EnvironmentVariables(value = {
         @EnvironmentVariable(key = "DB_SECRET_NAME", value = "${db_secret_name}"),
+        @EnvironmentVariable(key = "DB_HOST", value = "${db_host}"),
         @EnvironmentVariable(key = "DB_NAME", value = "${db_name}"),
         @EnvironmentVariable(key = "DB_PORT", value = "${db_port}"),
         @EnvironmentVariable(key = "REGION", value = "${region}")
