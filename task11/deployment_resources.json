@@ -126,22 +126,34 @@
       "Statement": [
         {
           "Effect": "Allow",
-          "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+          "Action": [
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
           "Resource": "*"
         },
         {
           "Effect": "Allow",
-          "Action": ["secretsmanager:GetSecretValue"],
+          "Action": [
+            "secretsmanager:GetSecretValue"
+          ],
           "Resource": "*"
         },
         {
           "Effect": "Allow",
-          "Action": ["ec2:CreateNetworkInterface", "ec2:DescribeNetworkInterfaces", "ec2:DeleteNetworkInterface"],
+          "Action": [
+            "ec2:CreateNetworkInterface",
+            "ec2:DescribeNetworkInterfaces",
+            "ec2:DeleteNetworkInterface"
+          ],
           "Resource": "*"
         },
         {
           "Effect": "Allow",
-          "Action": ["rds-db:connect"],
+          "Action": [
+            "rds-db:connect"
+          ],
           "Resource": "*"
         }
       ]
@@ -163,17 +175,26 @@
       "Statement": [
         {
           "Effect": "Allow",
-          "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+          "Action": [
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
           "Resource": "*"
         },
         {
           "Effect": "Allow",
-          "Action": ["secretsmanager:GetSecretValue"],
+          "Action": [
+            "secretsmanager:GetSecretValue"
+          ],
           "Resource": "*"
         },
         {
           "Effect": "Allow",
-          "Action": ["s3:GetObject", "s3:ListBucket"],
+          "Action": [
+            "s3:GetObject",
+            "s3:ListBucket"
+          ],
           "Resource": [
             "arn:aws:s3:::data-transfer-storage",
             "arn:aws:s3:::data-transfer-storage/*"
@@ -181,12 +202,18 @@
         },
         {
           "Effect": "Allow",
-          "Action": ["ec2:CreateNetworkInterface", "ec2:DescribeNetworkInterfaces", "ec2:DeleteNetworkInterface"],
+          "Action": [
+            "ec2:CreateNetworkInterface",
+            "ec2:DescribeNetworkInterfaces",
+            "ec2:DeleteNetworkInterface"
+          ],
           "Resource": "*"
         },
         {
           "Effect": "Allow",
-          "Action": ["rds-db:connect"],
+          "Action": [
+            "rds-db:connect"
+          ],
           "Resource": "*"
         }
       ]

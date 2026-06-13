@@ -29,7 +29,7 @@ public class DatabaseUtil {
         }
 
         if (cachedEndpoint == null) {
-            cachedEndpoint = System.getenv("DB_HOST");
+            cachedEndpoint = System.getenv("DB_ENDPOINT"); // DB_HOST → DB_ENDPOINT
         }
 
         if (cachedUsername == null || cachedPassword == null) {
@@ -75,7 +75,7 @@ public class DatabaseUtil {
 
     private static void loadCredentials() {
         String region = System.getenv("REGION");
-        String secretName = System.getenv("DB_SECRET_NAME");
+        String secretName = System.getenv("MASTER_USER_SECRET_NAME");
 
         AWSSecretsManager client = AWSSecretsManagerClientBuilder.standard()
                 .withRegion(region)

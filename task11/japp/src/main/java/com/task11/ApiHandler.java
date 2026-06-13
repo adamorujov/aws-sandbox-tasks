@@ -48,8 +48,8 @@ import com.syndicate.deployment.model.lambda.url.InvokeMode;
         invokeMode = InvokeMode.BUFFERED
 )
 @EnvironmentVariables(value = {
-        @EnvironmentVariable(key = "DB_SECRET_NAME", value = "${db_secret_name}"),
-        @EnvironmentVariable(key = "DB_HOST", value = "${db_host}"),
+        @EnvironmentVariable(key = "DB_ENDPOINT", value = "${db_endpoint}"),
+        @EnvironmentVariable(key = "MASTER_USER_SECRET_NAME", value = "${master_user_secret_name}"),
         @EnvironmentVariable(key = "DB_NAME", value = "${db_name}"),
         @EnvironmentVariable(key = "DB_PORT", value = "${db_port}"),
         @EnvironmentVariable(key = "REGION", value = "${region}")
@@ -108,59 +108,56 @@ public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, A
     // ======================== INIT DB ========================
 
     private APIGatewayProxyResponseEvent initDb(LambdaLogger logger) throws Exception {
-        logger.log("Initializing database tables...");
+		logger.log("Initializing database tables...");
 
-        try (Connection conn = DatabaseUtil.getConnection();
-             Statement stmt = conn.createStatement()) {
+		try (Connection conn = DatabaseUtil.getConnection();
+			Statement stmt = conn.createStatement()) {
 
-            // StatusType enum yaratmaq (əgər mövcud deyilsə)
-            stmt.execute(
-                    "DO $$ BEGIN " +
-                            "CREATE TYPE StatusType AS ENUM('CREATED', 'IN_TRANSIT', 'DELAYED', 'DELIVERED', 'CANCELLED'); " +
-                            "EXCEPTION WHEN duplicate_object THEN null; " +
-                            "END $$;"
-            );
+			stmt.execute(
+					"DO $$ BEGIN " +
+					"CREATE TYPE StatusType AS ENUM('CREATED', 'IN_TRANSIT', 'DELAYED', 'DELIVERED', 'CANCELLED'); " +
+					"EXCEPTION WHEN duplicate_object THEN null; " +
+					"END $$;"
+			);
 
-            // shipments table
-            stmt.execute(
-                    "CREATE TABLE IF NOT EXISTS shipments (" +
-                            "shipment_id VARCHAR(50) PRIMARY KEY, " +
-                            "order_id VARCHAR(50), " +
-                            "origin VARCHAR(100), " +
-                            "destination VARCHAR(100), " +
-                            "weight_kg DECIMAL(10,2), " +
-                            "created_at TIMESTAMPTZ" +
-                            ")"
-            );
+			stmt.execute(
+					"CREATE TABLE IF NOT EXISTS shipments (" +
+					"shipment_id VARCHAR(50) PRIMARY KEY, " +
+					"order_id VARCHAR(50), " +
+					"origin VARCHAR(100), " +
+					"destination VARCHAR(100), " +
+					"weight_kg DECIMAL(10,2), " +
+					"created_at TIMESTAMPTZ" +
+					")"
+			);
 
-            // carriers table
-            stmt.execute(
-                    "CREATE TABLE IF NOT EXISTS carriers (" +
-                            "carrier_id VARCHAR(50) PRIMARY KEY, " +
-                            "name VARCHAR(100), " +
-                            "email VARCHAR(100), " +
-                            "phone VARCHAR(20), " +
-                            "is_active BOOLEAN" +
-                            ")"
-            );
+			stmt.execute(
+					"CREATE TABLE IF NOT EXISTS carriers (" +
+					"carrier_id VARCHAR(50) PRIMARY KEY, " +
+					"name VARCHAR(100), " +
+					"email VARCHAR(100), " +
+					"phone VARCHAR(20), " +
+					"is_active BOOLEAN" +
+					")"
+			);
 
-            // status_updates table
-            stmt.execute(
-                    "CREATE TABLE IF NOT EXISTS status_updates (" +
-                            "update_id SERIAL PRIMARY KEY, " +
-                            "shipment_id VARCHAR(50) REFERENCES shipments(shipment_id), " +
-                            "carrier_id VARCHAR(50) REFERENCES carriers(carrier_id), " +
-                            "status StatusType, " +
-                            "location VARCHAR(100), " +
-                            "notes TEXT, " +
-                            "\"timestamp\" TIMESTAMPTZ" +
-                            ")"
-            );
+			stmt.execute(
+					"CREATE TABLE IF NOT EXISTS status_updates (" +
+					"update_id SERIAL PRIMARY KEY, " +
+					"shipment_id VARCHAR(50) REFERENCES shipments(shipment_id), " +
+					"carrier_id VARCHAR(50) REFERENCES carriers(carrier_id), " +
+					"status StatusType, " +
+					"location VARCHAR(100), " +
+					"notes TEXT, " +
+					"\"timestamp\" TIMESTAMPTZ" +
+					")"
+			);
 
-            logger.log("Database initialized successfully");
-            return buildResponse(200, "{\"message\":\"Database initialized successfully\"}");
-        }
-    }
+			logger.log("Database initialized successfully");
+			// ✅ Boş body ilə 200 qaytarır
+			return buildResponse(200, "");
+		}
+	}
 
     // ======================== SHIPMENTS ========================
 

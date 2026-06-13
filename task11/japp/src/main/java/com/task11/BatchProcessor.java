@@ -45,7 +45,8 @@ import com.syndicate.deployment.model.RetentionSetting;
         events = {"s3:ObjectCreated:*"}
 )
 @EnvironmentVariables(value = {
-        @EnvironmentVariable(key = "DB_SECRET_NAME", value = "${db_secret_name}"),
+        @EnvironmentVariable(key = "DB_ENDPOINT", value = "${db_endpoint}"),
+        @EnvironmentVariable(key = "MASTER_USER_SECRET_NAME", value = "${master_user_secret_name}"),
         @EnvironmentVariable(key = "DB_NAME", value = "${db_name}"),
         @EnvironmentVariable(key = "DB_PORT", value = "${db_port}"),
         @EnvironmentVariable(key = "REGION", value = "${region}")
