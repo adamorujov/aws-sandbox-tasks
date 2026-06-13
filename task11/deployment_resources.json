@@ -1,5 +1,5 @@
 {
-  "logistic-api": {
+  "logistic_API": {
     "resource_type": "api_gateway",
     "deploy_stage": "api",
     "resources": {
@@ -175,8 +175,8 @@
           "Effect": "Allow",
           "Action": ["s3:GetObject", "s3:ListBucket"],
           "Resource": [
-            "arn:aws:s3:::logistic-data-bucket",
-            "arn:aws:s3:::logistic-data-bucket/*"
+            "arn:aws:s3:::data-transfer-storage",
+            "arn:aws:s3:::data-transfer-storage/*"
           ]
         },
         {
@@ -193,7 +193,7 @@
     }
   },
 
-  "logistic-data-bucket": {
+  "data-transfer-storage": {
     "resource_type": "s3_bucket",
     "acl": "private",
     "location": "eu-west-1"

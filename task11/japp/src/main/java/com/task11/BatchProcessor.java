@@ -1,20 +1,5 @@
 package com.task11;
 
-import com.amazonaws.services.lambda.runtime.Context;
-import com.amazonaws.services.lambda.runtime.LambdaLogger;
-import com.amazonaws.services.lambda.runtime.RequestHandler;
-import com.amazonaws.services.lambda.runtime.events.S3Event;
-import com.amazonaws.services.lambda.runtime.events.models.s3.S3EventNotification;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
-import com.amazonaws.services.s3.model.S3Object;
-import com.syndicate.deployment.annotations.environment.EnvironmentVariable;
-import com.syndicate.deployment.annotations.environment.EnvironmentVariables;
-import com.syndicate.deployment.annotations.events.S3EventSource;
-import com.syndicate.deployment.annotations.lambda.LambdaHandler;
-import com.syndicate.deployment.model.DeploymentRuntime;
-import com.syndicate.deployment.model.RetentionSetting;
-
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -30,6 +15,21 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.LambdaLogger;
+import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.events.S3Event;
+import com.amazonaws.services.lambda.runtime.events.models.s3.S3EventNotification;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.S3Object;
+import com.syndicate.deployment.annotations.environment.EnvironmentVariable;
+import com.syndicate.deployment.annotations.environment.EnvironmentVariables;
+import com.syndicate.deployment.annotations.events.S3EventSource;
+import com.syndicate.deployment.annotations.lambda.LambdaHandler;
+import com.syndicate.deployment.model.DeploymentRuntime;
+import com.syndicate.deployment.model.RetentionSetting;
+
 @LambdaHandler(
         lambdaName = "batch_processor",
         roleName = "batch_processor-role",
@@ -41,7 +41,7 @@ import java.util.List;
         memory = 512
 )
 @S3EventSource(
-        targetBucket = "logistic-data-bucket",
+        targetBucket = "data-transfer-storage",
         events = {"s3:ObjectCreated:*"}
 )
 @EnvironmentVariables(value = {
