@@ -1,0 +1,201 @@
+{
+  "logistic-api": {
+    "resource_type": "api_gateway",
+    "deploy_stage": "api",
+    "resources": {
+      "/initdb": {
+        "enable_cors": true,
+        "POST": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        }
+      },
+      "/shipments": {
+        "enable_cors": true,
+        "GET": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        },
+        "POST": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        }
+      },
+      "/shipments/{shipmentId}": {
+        "enable_cors": true,
+        "GET": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        },
+        "PATCH": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        },
+        "DELETE": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        }
+      },
+      "/carriers": {
+        "enable_cors": true,
+        "GET": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        },
+        "POST": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        }
+      },
+      "/carriers/{carrierId}": {
+        "enable_cors": true,
+        "GET": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        },
+        "PATCH": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        },
+        "DELETE": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        }
+      },
+      "/statusupdates": {
+        "enable_cors": true,
+        "GET": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        },
+        "POST": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        }
+      },
+      "/statusupdates/{shipmentId}": {
+        "enable_cors": true,
+        "GET": {
+          "enable_proxy": true,
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "authorization_type": "NONE"
+        }
+      }
+    }
+  },
+
+  "api_handler-role": {
+    "resource_type": "iam_role",
+    "predefined_policies": [],
+    "principal_service": "lambda",
+    "custom_policies": ["api_handler-policy"],
+    "allowed_accounts": ["980921730449"]
+  },
+
+  "api_handler-policy": {
+    "resource_type": "iam_policy",
+    "policy_content": {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+          "Resource": "*"
+        },
+        {
+          "Effect": "Allow",
+          "Action": ["secretsmanager:GetSecretValue"],
+          "Resource": "*"
+        },
+        {
+          "Effect": "Allow",
+          "Action": ["ec2:CreateNetworkInterface", "ec2:DescribeNetworkInterfaces", "ec2:DeleteNetworkInterface"],
+          "Resource": "*"
+        },
+        {
+          "Effect": "Allow",
+          "Action": ["rds-db:connect"],
+          "Resource": "*"
+        }
+      ]
+    }
+  },
+
+  "batch_processor-role": {
+    "resource_type": "iam_role",
+    "predefined_policies": [],
+    "principal_service": "lambda",
+    "custom_policies": ["batch_processor-policy"],
+    "allowed_accounts": ["980921730449"]
+  },
+
+  "batch_processor-policy": {
+    "resource_type": "iam_policy",
+    "policy_content": {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+          "Resource": "*"
+        },
+        {
+          "Effect": "Allow",
+          "Action": ["secretsmanager:GetSecretValue"],
+          "Resource": "*"
+        },
+        {
+          "Effect": "Allow",
+          "Action": ["s3:GetObject", "s3:ListBucket"],
+          "Resource": [
+            "arn:aws:s3:::logistic-data-bucket",
+            "arn:aws:s3:::logistic-data-bucket/*"
+          ]
+        },
+        {
+          "Effect": "Allow",
+          "Action": ["ec2:CreateNetworkInterface", "ec2:DescribeNetworkInterfaces", "ec2:DeleteNetworkInterface"],
+          "Resource": "*"
+        },
+        {
+          "Effect": "Allow",
+          "Action": ["rds-db:connect"],
+          "Resource": "*"
+        }
+      ]
+    }
+  },
+
+  "logistic-data-bucket": {
+    "resource_type": "s3_bucket",
+    "acl": "private",
+    "location": "eu-west-1"
+  }
+}
