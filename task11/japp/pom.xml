@@ -16,77 +16,56 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <src.dir>src/main/java</src.dir>
         <resources.dir>src/main/resources</resources.dir>
-        <aws.sdk.version>1.12.641</aws.sdk.version>
     </properties>
 
     <dependencies>
-        <!-- AWS Lambda Java Core -->
+        <!-- AWS dependencies-->
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-lambda-java-core</artifactId>
-            <version>1.2.3</version>
+            <version>1.2.0</version>
         </dependency>
-
-        <!-- AWS Lambda Java Events (for S3Event, APIGatewayProxyRequestEvent, etc.) -->
+        <!-- AWS Lambda Events (S3Event, APIGatewayProxyRequestEvent, etc.) -->
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-lambda-java-events</artifactId>
             <version>3.11.4</version>
         </dependency>
-
-        <!-- Syndicate annotations -->
+        
         <dependency>
-            <groupId>net.sf.aws-syndicate</groupId>
-            <artifactId>deployment-configuration-annotations</artifactId>
-            <version>${syndicate.java.plugin.version}</version>
+            <groupId>com.amazonaws</groupId>
+            <artifactId>aws-java-sdk-core</artifactId>
+            <version>1.12.668</version>
         </dependency>
-
-        <!-- AWS SDK - Secrets Manager -->
+        <!-- AWS SDK Secrets Manager -->
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-secretsmanager</artifactId>
-            <version>${aws.sdk.version}</version>
+            <version>1.12.668</version>
         </dependency>
-
-        <!-- AWS SDK - S3 -->
+        <!-- AWS SDK S3 -->
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-s3</artifactId>
-            <version>${aws.sdk.version}</version>
+            <version>1.12.668</version>
         </dependency>
-
         <!-- PostgreSQL JDBC Driver -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <version>42.7.1</version>
         </dependency>
-
-        <!-- Gson for JSON processing -->
+        <!-- Jackson Databind (JSON parsing) -->
         <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-            <version>2.10.1</version>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.16.1</version>
         </dependency>
-
-        <!-- SLF4J API -->
+        <!--Syndicate annotations-->
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>2.0.9</version>
-        </dependency>
-
-        <!-- SLF4J Simple binding (lightweight, works well in Lambda) -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>2.0.9</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-java-sdk-core</artifactId>
-            <version>${aws.sdk.version}</version>
+            <groupId>net.sf.aws-syndicate</groupId>
+            <artifactId>deployment-configuration-annotations</artifactId>
+            <version>${syndicate.java.plugin.version}</version>
         </dependency>
     </dependencies>
 
@@ -96,7 +75,7 @@
             <resource>
                 <directory>${resources.dir}</directory>
             </resource>
-        </resources>
+        </resources>        
         <plugins>
             <plugin>
                 <groupId>net.sf.aws-syndicate</groupId>
@@ -137,10 +116,6 @@
                         </filter>
                     </filters>
                     <createDependencyReducedPom>false</createDependencyReducedPom>
-                    <transformers>
-                        <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer"/>
-                        <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                    </transformers>
                 </configuration>
                 <executions>
                     <execution>
