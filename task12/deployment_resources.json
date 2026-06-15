@@ -126,14 +126,14 @@
       "/tables": {
         "enable_cors": true,
         "GET": {
-          "authorization_type": "CUSTOM",
+          "authorization_type": "authorizer",
           "authorizer_name": "authorizer",
           "integration_type": "lambda",
           "lambda_name": "api_handler",
           "enable_proxy": true
         },
         "POST": {
-          "authorization_type": "CUSTOM",
+          "authorization_type": "authorizer",
           "authorizer_name": "authorizer",
           "integration_type": "lambda",
           "lambda_name": "api_handler",
@@ -143,7 +143,7 @@
       "/tables/{tableId}": {
         "enable_cors": true,
         "GET": {
-          "authorization_type": "CUSTOM",
+          "authorization_type": "authorizer",
           "authorizer_name": "authorizer",
           "integration_type": "lambda",
           "lambda_name": "api_handler",
@@ -153,14 +153,14 @@
       "/reservations": {
         "enable_cors": true,
         "GET": {
-          "authorization_type": "CUSTOM",
+          "authorization_type": "authorizer",
           "authorizer_name": "authorizer",
           "integration_type": "lambda",
           "lambda_name": "api_handler",
           "enable_proxy": true
         },
         "POST": {
-          "authorization_type": "CUSTOM",
+          "authorization_type": "authorizer",
           "authorizer_name": "authorizer",
           "integration_type": "lambda",
           "lambda_name": "api_handler",
