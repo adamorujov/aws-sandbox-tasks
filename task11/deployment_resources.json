@@ -7,14 +7,13 @@
             "logs:CreateLogGroup",
             "logs:CreateLogStream",
             "logs:PutLogEvents",
-            "dynamodb:GetItem",
-            "dynamodb:Query",
-            "dynamodb:PutItem",
-            "dynamodb:Batch*",
-            "dynamodb:DeleteItem",
-            "ssm:PutParameter",
-            "ssm:GetParameter",
-            "kms:Decrypt"
+            "secretsmanager:GetSecretValue",
+            "kms:Decrypt",
+            "ec2:DescribeNetworkInterfaces",
+            "ec2:CreateNetworkInterface",
+            "ec2:DeleteNetworkInterface",
+            "s3:GetObject",
+            "s3:ListBucket"
           ],
           "Effect": "Allow",
           "Resource": "*"
@@ -272,7 +271,7 @@
     "publicly_accessible": true,
     "tags": {}
   },
-  "data-transfer-storage-adam123": {
+  "data-transfer-storage": {
     "resource_type": "s3_bucket",
     "acl": "private",
     "cors": [],

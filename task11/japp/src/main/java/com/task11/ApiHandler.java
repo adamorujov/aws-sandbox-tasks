@@ -1,5 +1,17 @@
 package com.task11;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
@@ -12,20 +24,23 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.syndicate.deployment.annotations.environment.EnvironmentVariable;
 import com.syndicate.deployment.annotations.environment.EnvironmentVariables;
 import com.syndicate.deployment.annotations.lambda.LambdaHandler;
+import com.syndicate.deployment.model.DeploymentRuntime;
 import com.syndicate.deployment.model.RetentionSetting;
 import com.syndicate.deployment.model.environment.ValueTransformer;
-
-import java.sql.*;
-import java.util.*;
 
 @LambdaHandler(
     lambdaName = "api_handler",
     roleName = "api_handler-role",
+	runtime = DeploymentRuntime.JAVA11,
     isPublishVersion = true,
     aliasName = "${lambdas_alias_name}",
+	subnetsIds = {"${lambda_sn_id}"},
+    securityGroupIds = {"${logistic_sg_id}"},
     logsExpiration = RetentionSetting.SYNDICATE_ALIASES_SPECIFIED
 )
 @EnvironmentVariables(value = {
+	@EnvironmentVariable(key = "lambda_sn_id", value = "${lambda_sn_id}"),
+    @EnvironmentVariable(key = "logistic_sg_id", value = "${logistic_sg_id}"),
     @EnvironmentVariable(key = "REGION", value = "${region}"),
     @EnvironmentVariable(key = "DB_ENDPOINT", value = "logistic-cluster",
         valueTransformer = ValueTransformer.RDS_DB_CLUSTER_NAME_TO_ENDPOINT),
