@@ -1,23 +1,31 @@
 package com.task12;
 
-import java.util.HashMap;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.LambdaLogger;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.syndicate.deployment.annotations.environment.EnvironmentVariable;
 import com.syndicate.deployment.annotations.environment.EnvironmentVariables;
 import com.syndicate.deployment.annotations.lambda.LambdaHandler;
 import com.syndicate.deployment.annotations.resources.DependsOn;
+import com.syndicate.deployment.model.DeploymentRuntime;
 import com.syndicate.deployment.model.ResourceType;
+import com.syndicate.deployment.model.RetentionSetting;
 import com.syndicate.deployment.model.environment.ValueTransformer;
 
 import software.amazon.awssdk.regions.Region;
@@ -25,437 +33,514 @@ import software.amazon.awssdk.services.cognitoidentityprovider.CognitoIdentityPr
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminCreateUserRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminInitiateAuthRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminInitiateAuthResponse;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminRespondToAuthChallengeRequest;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminRespondToAuthChallengeResponse;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AdminSetUserPasswordRequest;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AttributeType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.AuthFlowType;
-import software.amazon.awssdk.services.cognitoidentityprovider.model.ChallengeNameType;
 import software.amazon.awssdk.services.cognitoidentityprovider.model.MessageActionType;
+import software.amazon.awssdk.services.cognitoidentityprovider.model.UsernameExistsException;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
-import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.ScanRequest;
-import software.amazon.awssdk.services.dynamodb.model.ScanResponse;
 
 @LambdaHandler(
-        lambdaName = "api_handler",
-        roleName = "api_handler-role",
-        isPublishVersion = true,
-        aliasName = "${lambdas_alias_name}"
-)
+    lambdaName = "api_handler",
+    roleName = "api_handler-role",
+    isPublishVersion = true,
+    runtime = DeploymentRuntime.JAVA21,
+    timeout = 60,
+    memory = 150,
+    aliasName = "${lambdas_alias_name}",
+    logsExpiration = RetentionSetting.SYNDICATE_ALIASES_SPECIFIED)
 @DependsOn(resourceType = ResourceType.COGNITO_USER_POOL, name = "${booking_userpool}")
-@EnvironmentVariables(value = {
-        @EnvironmentVariable(key = "REGION", value = "${region}"),
-        @EnvironmentVariable(key = "COGNITO_ID", value = "${booking_userpool}", valueTransformer = ValueTransformer.USER_POOL_NAME_TO_USER_POOL_ID),
-        @EnvironmentVariable(key = "CLIENT_ID", value = "${booking_userpool}", valueTransformer = ValueTransformer.USER_POOL_NAME_TO_CLIENT_ID),
-        @EnvironmentVariable(key = "tables_table", value = "${tables_table}"),
-        @EnvironmentVariable(key = "reservations_table", value = "${reservations_table}")
-})
-public class ApiHandler implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
+@EnvironmentVariables(
+    value = {
+      @EnvironmentVariable(key = "REGION", value = "${region}"),
+      @EnvironmentVariable(key = "TABLES_TABLE", value = "${tables_table}"),
+      @EnvironmentVariable(key = "RESERVATIONS_TABLE", value = "${reservations_table}"),
+      @EnvironmentVariable(
+          key = "COGNITO_ID",
+          value = "${booking_userpool}",
+          valueTransformer = ValueTransformer.USER_POOL_NAME_TO_USER_POOL_ID),
+      @EnvironmentVariable(
+          key = "CLIENT_ID",
+          value = "${booking_userpool}",
+          valueTransformer = ValueTransformer.USER_POOL_NAME_TO_CLIENT_ID)
+    })
+public class ApiHandler
+    implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
 
-    private final Gson gson = new GsonBuilder().create();
-    private final CognitoIdentityProviderClient cognitoClient;
-    private final DynamoDbClient dynamoDbClient;
-    private final String userPoolId;
-    private final String clientId;
-    private final String tablesTableName;
-    private final String reservationsTableName;
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final Pattern EMAIL_PATTERN =
+      Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$");
+  private static final Pattern PASSWORD_PATTERN =
+      Pattern.compile("^[A-Za-z0-9$%^*_\\-]{12,}$");
 
-    public ApiHandler() {
-        String regionStr = System.getenv("REGION");
-        Region region = Region.of(regionStr);
-        this.userPoolId = System.getenv("COGNITO_ID");
-        this.clientId = System.getenv("CLIENT_ID");
-        this.tablesTableName = System.getenv("tables_table");
-        this.reservationsTableName = System.getenv("reservations_table");
+  private final Region region;
+  private final DynamoDbClient dynamoDb;
+  private final CognitoIdentityProviderClient cognito;
+  private final String tablesTable;
+  private final String reservationsTable;
+  private final String userPoolId;
+  private final String clientId;
+  private LambdaLogger logger;
 
-        this.cognitoClient = CognitoIdentityProviderClient.builder()
-                .region(region)
-                .build();
+  public ApiHandler() {
+    this.region = Region.of(requiredEnv("REGION"));
+    this.dynamoDb = DynamoDbClient.builder().region(region).build();
+    this.cognito = CognitoIdentityProviderClient.builder().region(region).build();
+    this.tablesTable = requiredEnv("TABLES_TABLE");
+    this.reservationsTable = requiredEnv("RESERVATIONS_TABLE");
+    this.userPoolId = requiredEnv("COGNITO_ID");
+    this.clientId = requiredEnv("CLIENT_ID");
+  }
 
-        this.dynamoDbClient = DynamoDbClient.builder()
-                .region(region)
-                .build();
+  @Override
+  public APIGatewayProxyResponseEvent handleRequest(
+      APIGatewayProxyRequestEvent request, Context context) {
+    logger = context.getLogger();
+    if (request == null) {
+      return response(400, new MessageResponse("Bad request: request is null"));
     }
 
-    @Override
-    public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent event, Context context) {
-        context.getLogger().log("Event: " + gson.toJson(event));
+    String method = Objects.toString(request.getHttpMethod(), "");
+    String resource = route(request);
+    logger.log("API request received: " + method + " " + resource);
 
-        String path = event.getResource();
-        if (path == null || path.isEmpty()) {
-            path = event.getPath();
-        }
-        String method = event.getHttpMethod();
+    try {
+      if ("/signup".equals(resource)) {
+        return postOnly(method, () -> signup(body(request)));
+      } else if ("/signin".equals(resource)) {
+        return postOnly(method, () -> signin(body(request)));
+      } else if ("/tables".equals(resource)) {
+        return handleTables(method, request);
+      } else if ("/tables/{tableId}".equals(resource)) {
+        return getOnly(method, () -> getTable(pathParam(request, "tableId")));
+      } else if ("/reservations".equals(resource)) {
+        return handleReservations(method, request);
+      } else {
+        return response(400, new MessageResponse("Bad request syntax or unsupported resource"));
+      }
+    } catch (BadRequestException e) {
+      logger.log("Bad request: " + e.getMessage());
+      return response(400, new MessageResponse(e.getMessage()));
+    } catch (Exception e) {
+      logger.log("Request failed. " + e.getClass().getName() + ": " + e.getMessage());
+      return response(400, new MessageResponse("There was an error in the request."));
+    }
+  }
 
-        context.getLogger().log("Path: " + path + ", Method: " + method);
+  private APIGatewayProxyResponseEvent handleTables(
+      String method, APIGatewayProxyRequestEvent request) throws Exception {
+    if ("GET".equals(method)) {
+      return listTables();
+    } else if ("POST".equals(method)) {
+      return createTable(body(request));
+    } else {
+      return response(400, new MessageResponse("Unsupported method for /tables"));
+    }
+  }
 
-        try {
-            if ("/signup".equals(path) && "POST".equals(method)) {
-                return handleSignup(event, context);
-            } else if ("/signin".equals(path) && "POST".equals(method)) {
-                return handleSignin(event, context);
-            } else if ("/tables".equals(path) && "GET".equals(method)) {
-                return handleGetTables(context);
-            } else if ("/tables".equals(path) && "POST".equals(method)) {
-                return handleCreateTable(event, context);
-            } else if ("/tables/{tableId}".equals(path) && "GET".equals(method)) {
-                return handleGetTableById(event, context);
-            } else if ("/reservations".equals(path) && "POST".equals(method)) {
-                return handleCreateReservation(event, context);
-            } else if ("/reservations".equals(path) && "GET".equals(method)) {
-                return handleGetReservations(context);
-            } else {
-                return buildResponse(400, Map.of("message", "Bad request. Path: " + path));
-            }
-        } catch (Exception e) {
-            context.getLogger().log("Error: " + e.getMessage());
-            return buildResponse(400, Map.of("message", "Error: " + e.getMessage()));
-        }
+  private APIGatewayProxyResponseEvent handleReservations(
+      String method, APIGatewayProxyRequestEvent request) throws Exception {
+    if ("GET".equals(method)) {
+      return listReservations();
+    } else if ("POST".equals(method)) {
+      return createReservation(body(request));
+    } else {
+      return response(400, new MessageResponse("Unsupported method for /reservations"));
+    }
+  }
+
+  private static APIGatewayProxyResponseEvent getOnly(String method, ThrowingHandler handler)
+      throws Exception {
+    if (!"GET".equals(method)) {
+      return response(400, new MessageResponse("Unsupported method"));
+    }
+    return handler.handle();
+  }
+
+  private static APIGatewayProxyResponseEvent postOnly(String method, ThrowingHandler handler)
+      throws Exception {
+    if (!"POST".equals(method)) {
+      return response(400, new MessageResponse("Unsupported method"));
+    }
+    return handler.handle();
+  }
+
+  private static JsonNode body(APIGatewayProxyRequestEvent request) throws Exception {
+    String body = request.getBody();
+    if (body == null || body.trim().isEmpty()) {
+      throw new BadRequestException("Request body is required");
+    }
+    return MAPPER.readTree(body);
+  }
+
+  private static String route(APIGatewayProxyRequestEvent request) {
+    String resource = request.getResource();
+    if (resource != null && !resource.trim().isEmpty()) {
+      return resource;
+    }
+    String path = Objects.toString(request.getPath(), "");
+    if (path.matches(".*/tables/[^/]+$")) {
+      return "/tables/{tableId}";
+    }
+    if (path.endsWith("/signup")) return "/signup";
+    if (path.endsWith("/signin")) return "/signin";
+    if (path.endsWith("/tables")) return "/tables";
+    if (path.endsWith("/reservations")) return "/reservations";
+    return path;
+  }
+
+  private static String pathParam(APIGatewayProxyRequestEvent request, String name) {
+    Map<String, String> params = request.getPathParameters();
+    if (params != null && params.get(name) != null && !params.get(name).trim().isEmpty()) {
+      return params.get(name);
+    }
+    String path = Objects.toString(request.getPath(), "");
+    int slash = path.lastIndexOf('/');
+    if (slash >= 0 && slash + 1 < path.length()) {
+      return path.substring(slash + 1);
+    }
+    throw new BadRequestException("Missing path parameter: " + name);
+  }
+
+  private static String text(JsonNode body, String field) {
+    JsonNode value = body.get(field);
+    if (value == null || value.isNull() || value.asText().trim().isEmpty()) {
+      throw new BadRequestException("Missing required field: " + field);
+    }
+    return value.asText();
+  }
+
+  private static String email(JsonNode body) {
+    String value = text(body, "email");
+    if (!EMAIL_PATTERN.matcher(value).matches()) {
+      throw new BadRequestException("Invalid email");
+    }
+    return value;
+  }
+
+  private static String password(JsonNode body) {
+    String value = text(body, "password");
+    if (!PASSWORD_PATTERN.matcher(value).matches()) {
+      throw new BadRequestException("Invalid password");
+    }
+    return value;
+  }
+
+  private static int integer(JsonNode body, String field) {
+    JsonNode value = body.get(field);
+    if (value == null || !value.canConvertToInt()) {
+      throw new BadRequestException("Missing integer field: " + field);
+    }
+    return value.intValue();
+  }
+
+  private static boolean bool(JsonNode body) {
+    JsonNode value = body.get("isVip");
+    if (value == null || !value.isBoolean()) {
+      throw new BadRequestException("Missing boolean field: isVip");
+    }
+    return value.booleanValue();
+  }
+
+  private static String date(JsonNode body) {
+    String value = text(body, "date");
+    try {
+      LocalDate.parse(value);
+      return value;
+    } catch (DateTimeParseException e) {
+      throw new BadRequestException("Invalid date");
+    }
+  }
+
+  private static String time(JsonNode body, String field) {
+    String value = text(body, field);
+    try {
+      LocalTime.parse(value);
+      return value;
+    } catch (DateTimeParseException e) {
+      throw new BadRequestException("Invalid time");
+    }
+  }
+
+  private static AttributeValue s(int value) {
+    return AttributeValue.builder().s(String.valueOf(value)).build();
+  }
+
+  private static AttributeValue n(int value) {
+    return AttributeValue.builder().n(String.valueOf(value)).build();
+  }
+
+  private static int intValue(Map<String, AttributeValue> item, String key) {
+    AttributeValue value = item.get(key);
+    if (value == null) return 0;
+    if (value.n() != null) return Integer.parseInt(value.n());
+    return Integer.parseInt(value.s());
+  }
+
+  private static String stringValue(Map<String, AttributeValue> item, String key) {
+    AttributeValue value = item.get(key);
+    return value == null ? "" : value.s();
+  }
+
+  private static String requiredEnv(String key) {
+    String value = System.getenv(key);
+    if (value == null || value.trim().isEmpty()) {
+      throw new IllegalStateException("Missing environment variable: " + key);
+    }
+    return value;
+  }
+
+  private static APIGatewayProxyResponseEvent response(int statusCode, Object body) {
+    try {
+      Map<String, String> headers = new LinkedHashMap<>();
+      headers.put("Content-Type", "application/json");
+      return new APIGatewayProxyResponseEvent()
+          .withStatusCode(statusCode)
+          .withHeaders(headers)
+          .withBody(MAPPER.writeValueAsString(body));
+    } catch (Exception e) {
+      Map<String, String> headers = new LinkedHashMap<>();
+      headers.put("Content-Type", "application/json");
+      return new APIGatewayProxyResponseEvent()
+          .withStatusCode(400)
+          .withHeaders(headers)
+          .withBody("{\"message\":\"There was an error in the request.\"}");
+    }
+  }
+
+  // ─────────────────────────── SIGNUP ───────────────────────────
+  private APIGatewayProxyResponseEvent signup(JsonNode body) {
+    String firstName = text(body, "firstName");
+    String lastName = text(body, "lastName");
+    String emailValue = email(body);
+    String passwordValue = password(body);
+
+    try {
+      cognito.adminCreateUser(
+          AdminCreateUserRequest.builder()
+              .userPoolId(userPoolId)
+              .username(emailValue)
+              .temporaryPassword(passwordValue)
+              .messageAction(MessageActionType.SUPPRESS)
+              .userAttributes(
+                  AttributeType.builder().name("email").value(emailValue).build(),
+                  AttributeType.builder().name("email_verified").value("true").build(),
+                  AttributeType.builder().name("given_name").value(firstName).build(),
+                  AttributeType.builder().name("family_name").value(lastName).build())
+              .build());
+    } catch (UsernameExistsException ignored) {
+      throw new BadRequestException("User already exists");
     }
 
-    // ==================== SIGNUP ====================
-    private APIGatewayProxyResponseEvent handleSignup(APIGatewayProxyRequestEvent event, Context context) {
-        Map<String, Object> body = gson.fromJson(event.getBody(), Map.class);
+    cognito.adminSetUserPassword(
+        AdminSetUserPasswordRequest.builder()
+            .userPoolId(userPoolId)
+            .username(emailValue)
+            .password(passwordValue)
+            .permanent(true)
+            .build());
 
-        String firstName = (String) body.get("firstName");
-        String lastName = (String) body.get("lastName");
-        String email = (String) body.get("email");
-        String password = (String) body.get("password");
+    return response(200, new MessageResponse("Sign-up process is successful"));
+  }
 
-        context.getLogger().log("Signup request for email: " + email);
+  // ─────────────────────────── SIGNIN ───────────────────────────
+  private APIGatewayProxyResponseEvent signin(JsonNode body) {
+    String emailValue = email(body);
+    String passwordValue = password(body);
 
-        try {
-            AdminCreateUserRequest createUserRequest = AdminCreateUserRequest.builder()
-                    .userPoolId(userPoolId)
-                    .username(email)
-                    .temporaryPassword(password)
-                    .userAttributes(
-                            AttributeType.builder().name("email").value(email).build(),
-                            AttributeType.builder().name("given_name").value(firstName).build(),
-                            AttributeType.builder().name("family_name").value(lastName).build(),
-                            AttributeType.builder().name("email_verified").value("true").build()
-                    )
-                    .messageAction(MessageActionType.SUPPRESS)
-                    .build();
+    AdminInitiateAuthResponse auth =
+        cognito.adminInitiateAuth(
+            AdminInitiateAuthRequest.builder()
+                .userPoolId(userPoolId)
+                .clientId(clientId)
+                .authFlow(AuthFlowType.ADMIN_USER_PASSWORD_AUTH)
+                .authParameters(Map.of("USERNAME", emailValue, "PASSWORD", passwordValue))
+                .build());
 
-            cognitoClient.adminCreateUser(createUserRequest);
+    String idToken = auth.authenticationResult().idToken();
+    if (idToken == null || idToken.trim().isEmpty()) {
+      throw new BadRequestException("Authentication failed");
+    }
+    Map<String, String> result = new LinkedHashMap<>();
+    result.put("idToken", idToken);
+    return response(200, result);
+  }
 
-            AdminSetUserPasswordRequest setPasswordRequest = AdminSetUserPasswordRequest.builder()
-                    .userPoolId(userPoolId)
-                    .username(email)
-                    .password(password)
-                    .permanent(true)
-                    .build();
+  // ─────────────────────────── POST /tables ───────────────────────────
+  private APIGatewayProxyResponseEvent createTable(JsonNode body) {
+    int id = integer(body, "id");
+    int number = integer(body, "number");
+    int places = integer(body, "places");
+    boolean isVip = bool(body);
 
-            cognitoClient.adminSetUserPassword(setPasswordRequest);
-
-            context.getLogger().log("User created successfully: " + email);
-            return buildResponse(200, Map.of("message", "User has been successfully signed up."));
-
-        } catch (Exception e) {
-            context.getLogger().log("Signup error: " + e.getMessage());
-            return buildResponse(400, Map.of("message", "Sign up failed: " + e.getMessage()));
-        }
+    Map<String, AttributeValue> item = new LinkedHashMap<>();
+    item.put("id", s(id));
+    item.put("number", n(number));
+    item.put("places", n(places));
+    item.put("isVip", AttributeValue.builder().bool(isVip).build());
+    if (body.hasNonNull("minOrder")) {
+      item.put("minOrder", n(integer(body, "minOrder")));
     }
 
-    // ==================== SIGNIN ====================
-    private APIGatewayProxyResponseEvent handleSignin(APIGatewayProxyRequestEvent event, Context context) {
-        Map<String, Object> body = gson.fromJson(event.getBody(), Map.class);
+    dynamoDb.putItem(PutItemRequest.builder().tableName(tablesTable).item(item).build());
 
-        String email = (String) body.get("email");
-        String password = (String) body.get("password");
+    Map<String, Integer> result = new LinkedHashMap<>();
+    result.put("id", id);
+    return response(200, result);
+  }
 
-        context.getLogger().log("Signin request for email: " + email);
+  // ─────────────────────────── GET /tables ───────────────────────────
+  private APIGatewayProxyResponseEvent listTables() {
+    List<Map<String, Object>> tables =
+        dynamoDb.scan(ScanRequest.builder().tableName(tablesTable).build()).items().stream()
+            .map(this::tableFrom)
+            .sorted(Comparator.comparing(table -> (Integer) table.get("id")))
+            .collect(Collectors.toList());
 
-        try {
-            Map<String, String> authParams = new HashMap<>();
-            authParams.put("USERNAME", email);
-            authParams.put("PASSWORD", password);
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("tables", tables);
+    return response(200, result);
+  }
 
-            AdminInitiateAuthRequest authRequest = AdminInitiateAuthRequest.builder()
-                    .authFlow(AuthFlowType.ADMIN_USER_PASSWORD_AUTH)
-                    .userPoolId(userPoolId)
-                    .clientId(clientId)
-                    .authParameters(authParams)
-                    .build();
+  // ─────────────────────────── GET /tables/{tableId} ───────────────────────────
+  private APIGatewayProxyResponseEvent getTable(String tableId) {
+    Map<String, AttributeValue> item =
+        dynamoDb
+            .getItem(
+                GetItemRequest.builder()
+                    .tableName(tablesTable)
+                    .key(Map.of("id", AttributeValue.builder().s(tableId).build()))
+                    .build())
+            .item();
 
-            AdminInitiateAuthResponse authResponse = cognitoClient.adminInitiateAuth(authRequest);
+    if (item == null || item.isEmpty()) {
+      throw new BadRequestException("Table not found");
+    }
+    return response(200, tableFrom(item));
+  }
 
-            if (authResponse.challengeName() != null) {
-                context.getLogger().log("Challenge received: " + authResponse.challengeName());
+  // ─────────────────────────── POST /reservations ───────────────────────────
+  private APIGatewayProxyResponseEvent createReservation(JsonNode body) {
+    int tableNumber = integer(body, "tableNumber");
+    String clientName = text(body, "clientName");
+    String phoneNumber = text(body, "phoneNumber");
+    String dateValue = date(body);
+    String slotTimeStart = time(body, "slotTimeStart");
+    String slotTimeEnd = time(body, "slotTimeEnd");
 
-                if (authResponse.challengeName() == ChallengeNameType.NEW_PASSWORD_REQUIRED) {
-                    Map<String, String> challengeResponses = new HashMap<>();
-                    challengeResponses.put("USERNAME", email);
-                    challengeResponses.put("NEW_PASSWORD", password);
-
-                    AdminRespondToAuthChallengeRequest challengeRequest = AdminRespondToAuthChallengeRequest.builder()
-                            .userPoolId(userPoolId)
-                            .clientId(clientId)
-                            .challengeName(ChallengeNameType.NEW_PASSWORD_REQUIRED)
-                            .challengeResponses(challengeResponses)
-                            .session(authResponse.session())
-                            .build();
-
-                    AdminRespondToAuthChallengeResponse challengeResponse =
-                            cognitoClient.adminRespondToAuthChallenge(challengeRequest);
-
-                    String idToken = challengeResponse.authenticationResult().idToken();
-                    return buildResponse(200, Map.of("idToken", idToken));
-                }
-            }
-
-            String idToken = authResponse.authenticationResult().idToken();
-            context.getLogger().log("Signin successful for: " + email);
-            return buildResponse(200, Map.of("idToken", idToken));
-
-        } catch (Exception e) {
-            context.getLogger().log("Signin error: " + e.getMessage());
-            return buildResponse(400, Map.of("message", "Sign in failed: " + e.getMessage()));
-        }
+    if (!LocalTime.parse(slotTimeStart).isBefore(LocalTime.parse(slotTimeEnd))) {
+      throw new BadRequestException("slotTimeStart must be before slotTimeEnd");
+    }
+    if (!tableNumberExists(tableNumber)) {
+      throw new BadRequestException("Table not found");
+    }
+    if (hasReservationConflict(tableNumber, dateValue, slotTimeStart, slotTimeEnd)) {
+      throw new BadRequestException("Conflicting reservation");
     }
 
-    // ==================== GET /tables ====================
-    private APIGatewayProxyResponseEvent handleGetTables(Context context) {
-        try {
-            ScanRequest scanRequest = ScanRequest.builder()
-                    .tableName(tablesTableName)
-                    .build();
+    String reservationId = UUID.randomUUID().toString();
+    Map<String, AttributeValue> item = new LinkedHashMap<>();
+    item.put("id", AttributeValue.builder().s(reservationId).build());
+    item.put("tableNumber", n(tableNumber));
+    item.put("clientName", AttributeValue.builder().s(clientName).build());
+    item.put("phoneNumber", AttributeValue.builder().s(phoneNumber).build());
+    item.put("date", AttributeValue.builder().s(dateValue).build());
+    item.put("slotTimeStart", AttributeValue.builder().s(slotTimeStart).build());
+    item.put("slotTimeEnd", AttributeValue.builder().s(slotTimeEnd).build());
 
-            ScanResponse scanResponse = dynamoDbClient.scan(scanRequest);
+    dynamoDb.putItem(PutItemRequest.builder().tableName(reservationsTable).item(item).build());
 
-            List<Map<String, Object>> tables = scanResponse.items().stream()
-                    .map(this::convertDynamoItemToTable)
-                    .collect(Collectors.toList());
+    Map<String, String> result = new LinkedHashMap<>();
+    result.put("reservationId", reservationId);
+    return response(200, result);
+  }
 
-            return buildResponse(200, Map.of("tables", tables));
+  // ─────────────────────────── GET /reservations ───────────────────────────
+  private APIGatewayProxyResponseEvent listReservations() {
+    List<Map<String, Object>> reservations =
+        dynamoDb.scan(ScanRequest.builder().tableName(reservationsTable).build()).items().stream()
+            .map(this::reservationFrom)
+            .sorted(Comparator.comparing(r -> r.get("date").toString()))
+            .collect(Collectors.toList());
 
-        } catch (Exception e) {
-            context.getLogger().log("GetTables error: " + e.getMessage());
-            return buildResponse(400, Map.of("message", "Failed to get tables: " + e.getMessage()));
-        }
+    Map<String, Object> result = new LinkedHashMap<>();
+    result.put("reservations", reservations);
+    return response(200, result);
+  }
+
+  // ─────────────────────────── HELPERS ───────────────────────────
+  private boolean tableNumberExists(int tableNumber) {
+    return dynamoDb.scan(ScanRequest.builder().tableName(tablesTable).build()).items().stream()
+        .anyMatch(item -> intValue(item, "number") == tableNumber);
+  }
+
+  private boolean hasReservationConflict(
+      int tableNumber, String date, String slotTimeStart, String slotTimeEnd) {
+    LocalTime requestedStart = LocalTime.parse(slotTimeStart);
+    LocalTime requestedEnd = LocalTime.parse(slotTimeEnd);
+
+    for (Map<String, AttributeValue> item :
+        dynamoDb.scan(ScanRequest.builder().tableName(reservationsTable).build()).items()) {
+      if (intValue(item, "tableNumber") != tableNumber
+          || !stringValue(item, "date").equals(date)) {
+        continue;
+      }
+      LocalTime existingStart = LocalTime.parse(stringValue(item, "slotTimeStart"));
+      LocalTime existingEnd = LocalTime.parse(stringValue(item, "slotTimeEnd"));
+      if (requestedStart.isBefore(existingEnd) && requestedEnd.isAfter(existingStart)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private Map<String, Object> tableFrom(Map<String, AttributeValue> item) {
+    Map<String, Object> table = new LinkedHashMap<>();
+    table.put("id", intValue(item, "id"));
+    table.put("number", intValue(item, "number"));
+    table.put("places", intValue(item, "places"));
+    table.put("isVip", item.get("isVip").bool());
+    if (item.containsKey("minOrder")) {
+      table.put("minOrder", intValue(item, "minOrder"));
+    }
+    return table;
+  }
+
+  private Map<String, Object> reservationFrom(Map<String, AttributeValue> item) {
+    Map<String, Object> reservation = new LinkedHashMap<>();
+    reservation.put("tableNumber", intValue(item, "tableNumber"));
+    reservation.put("clientName", stringValue(item, "clientName"));
+    reservation.put("phoneNumber", stringValue(item, "phoneNumber"));
+    reservation.put("date", stringValue(item, "date"));
+    reservation.put("slotTimeStart", stringValue(item, "slotTimeStart"));
+    reservation.put("slotTimeEnd", stringValue(item, "slotTimeEnd"));
+    return reservation;
+  }
+
+  // ─────────────────────────── INNER TYPES ───────────────────────────
+  private interface ThrowingHandler {
+    APIGatewayProxyResponseEvent handle() throws Exception;
+  }
+
+  private static final class BadRequestException extends RuntimeException {
+    private BadRequestException(String message) {
+      super(message);
+    }
+  }
+
+  private static final class MessageResponse {
+    private final String message;
+
+    private MessageResponse(String message) {
+      this.message = message;
     }
 
-    // ==================== POST /tables ====================
-    private APIGatewayProxyResponseEvent handleCreateTable(APIGatewayProxyRequestEvent event, Context context) {
-        Map<String, Object> body = gson.fromJson(event.getBody(), Map.class);
-
-        try {
-            int id = ((Number) body.get("id")).intValue();
-            int number = ((Number) body.get("number")).intValue();
-            int places = ((Number) body.get("places")).intValue();
-            boolean isVip = (Boolean) body.get("isVip");
-
-            Map<String, AttributeValue> item = new HashMap<>();
-            item.put("id", AttributeValue.builder().n(String.valueOf(id)).build());
-            item.put("number", AttributeValue.builder().n(String.valueOf(number)).build());
-            item.put("places", AttributeValue.builder().n(String.valueOf(places)).build());
-            item.put("isVip", AttributeValue.builder().bool(isVip).build());
-
-            if (body.containsKey("minOrder") && body.get("minOrder") != null) {
-                int minOrder = ((Number) body.get("minOrder")).intValue();
-                item.put("minOrder", AttributeValue.builder().n(String.valueOf(minOrder)).build());
-            }
-
-            PutItemRequest putItemRequest = PutItemRequest.builder()
-                    .tableName(tablesTableName)
-                    .item(item)
-                    .build();
-
-            dynamoDbClient.putItem(putItemRequest);
-
-            context.getLogger().log("Table created with id: " + id);
-            return buildResponse(200, Map.of("id", id));
-
-        } catch (Exception e) {
-            context.getLogger().log("CreateTable error: " + e.getMessage());
-            return buildResponse(400, Map.of("message", "Failed to create table: " + e.getMessage()));
-        }
+    public String getMessage() {
+      return message;
     }
-
-    // ==================== GET /tables/{tableId} ====================
-    private APIGatewayProxyResponseEvent handleGetTableById(APIGatewayProxyRequestEvent event, Context context) {
-        try {
-            String tableIdStr = event.getPathParameters().get("tableId");
-            int tableId = Integer.parseInt(tableIdStr);
-
-            Map<String, AttributeValue> key = new HashMap<>();
-            key.put("id", AttributeValue.builder().n(String.valueOf(tableId)).build());
-
-            GetItemRequest getItemRequest = GetItemRequest.builder()
-                    .tableName(tablesTableName)
-                    .key(key)
-                    .build();
-
-            GetItemResponse getItemResponse = dynamoDbClient.getItem(getItemRequest);
-
-            if (!getItemResponse.hasItem() || getItemResponse.item().isEmpty()) {
-                return buildResponse(400, Map.of("message", "Table not found"));
-            }
-
-            Map<String, Object> table = convertDynamoItemToTable(getItemResponse.item());
-            return buildResponse(200, table);
-
-        } catch (Exception e) {
-            context.getLogger().log("GetTableById error: " + e.getMessage());
-            return buildResponse(400, Map.of("message", "Failed to get table: " + e.getMessage()));
-        }
-    }
-
-    // ==================== POST /reservations ====================
-    private APIGatewayProxyResponseEvent handleCreateReservation(APIGatewayProxyRequestEvent event, Context context) {
-        Map<String, Object> body = gson.fromJson(event.getBody(), Map.class);
-
-        try {
-            int tableNumber = ((Number) body.get("tableNumber")).intValue();
-            String clientName = (String) body.get("clientName");
-            String phoneNumber = (String) body.get("phoneNumber");
-            String date = (String) body.get("date");
-            String slotTimeStart = (String) body.get("slotTimeStart");
-            String slotTimeEnd = (String) body.get("slotTimeEnd");
-
-            // Masanın mövcudluğunu yoxla (tableNumber sahəsinə görə)
-            if (!checkTableExists(tableNumber)) {
-                return buildResponse(400, Map.of("message",
-                        "Table with number " + tableNumber + " does not exist."));
-            }
-
-            // Vaxt üst-üstə düşməsini yoxla
-            if (checkReservationOverlap(tableNumber, date, slotTimeStart, slotTimeEnd)) {
-                return buildResponse(400, Map.of("message",
-                        "Reservation overlaps with an existing one."));
-            }
-
-            String reservationId = UUID.randomUUID().toString();
-
-            Map<String, AttributeValue> item = new HashMap<>();
-            item.put("id", AttributeValue.builder().s(reservationId).build());
-            item.put("tableNumber", AttributeValue.builder().n(String.valueOf(tableNumber)).build());
-            item.put("clientName", AttributeValue.builder().s(clientName).build());
-            item.put("phoneNumber", AttributeValue.builder().s(phoneNumber).build());
-            item.put("date", AttributeValue.builder().s(date).build());
-            item.put("slotTimeStart", AttributeValue.builder().s(slotTimeStart).build());
-            item.put("slotTimeEnd", AttributeValue.builder().s(slotTimeEnd).build());
-
-            PutItemRequest putItemRequest = PutItemRequest.builder()
-                    .tableName(reservationsTableName)
-                    .item(item)
-                    .build();
-
-            dynamoDbClient.putItem(putItemRequest);
-
-            context.getLogger().log("Reservation created: " + reservationId);
-            return buildResponse(200, Map.of("reservationId", reservationId));
-
-        } catch (Exception e) {
-            context.getLogger().log("CreateReservation error: " + e.getMessage());
-            return buildResponse(400, Map.of("message", "Failed to create reservation: " + e.getMessage()));
-        }
-    }
-
-    // ==================== GET /reservations ====================
-    private APIGatewayProxyResponseEvent handleGetReservations(Context context) {
-        try {
-            ScanRequest scanRequest = ScanRequest.builder()
-                    .tableName(reservationsTableName)
-                    .build();
-
-            ScanResponse scanResponse = dynamoDbClient.scan(scanRequest);
-
-            List<Map<String, Object>> reservations = scanResponse.items().stream()
-                    .map(this::convertDynamoItemToReservation)
-                    .collect(Collectors.toList());
-
-            return buildResponse(200, Map.of("reservations", reservations));
-
-        } catch (Exception e) {
-            context.getLogger().log("GetReservations error: " + e.getMessage());
-            return buildResponse(400, Map.of("message", "Failed to get reservations: " + e.getMessage()));
-        }
-    }
-
-    // ==================== HELPER METHODS ====================
-
-    private boolean checkTableExists(int tableNumber) {
-        ScanRequest scanRequest = ScanRequest.builder()
-                .tableName(tablesTableName)
-                .filterExpression("#num = :tableNumber")
-                .expressionAttributeNames(Map.of("#num", "number"))
-                .expressionAttributeValues(Map.of(
-                        ":tableNumber", AttributeValue.builder().n(String.valueOf(tableNumber)).build()
-                ))
-                .build();
-
-        ScanResponse scanResponse = dynamoDbClient.scan(scanRequest);
-        return !scanResponse.items().isEmpty();
-    }
-
-    private boolean checkReservationOverlap(int tableNumber, String date,
-                                            String slotTimeStart, String slotTimeEnd) {
-        ScanRequest scanRequest = ScanRequest.builder()
-                .tableName(reservationsTableName)
-                .filterExpression("tableNumber = :tableNumber AND #d = :date")
-                .expressionAttributeNames(Map.of("#d", "date"))
-                .expressionAttributeValues(Map.of(
-                        ":tableNumber", AttributeValue.builder().n(String.valueOf(tableNumber)).build(),
-                        ":date", AttributeValue.builder().s(date).build()
-                ))
-                .build();
-
-        ScanResponse scanResponse = dynamoDbClient.scan(scanRequest);
-
-        for (Map<String, AttributeValue> item : scanResponse.items()) {
-            String existingStart = item.get("slotTimeStart").s();
-            String existingEnd = item.get("slotTimeEnd").s();
-
-            // Overlap: newStart < existingEnd AND newEnd > existingStart
-            if (slotTimeStart.compareTo(existingEnd) < 0 && slotTimeEnd.compareTo(existingStart) > 0) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private Map<String, Object> convertDynamoItemToTable(Map<String, AttributeValue> item) {
-        Map<String, Object> table = new LinkedHashMap<>();
-        table.put("id", Integer.parseInt(item.get("id").n()));
-        table.put("number", Integer.parseInt(item.get("number").n()));
-        table.put("places", Integer.parseInt(item.get("places").n()));
-        table.put("isVip", item.get("isVip").bool());
-        if (item.containsKey("minOrder") && item.get("minOrder") != null
-                && item.get("minOrder").n() != null) {
-            table.put("minOrder", Integer.parseInt(item.get("minOrder").n()));
-        }
-        return table;
-    }
-
-    private Map<String, Object> convertDynamoItemToReservation(Map<String, AttributeValue> item) {
-        Map<String, Object> reservation = new LinkedHashMap<>();
-        reservation.put("tableNumber", Integer.parseInt(item.get("tableNumber").n()));
-        reservation.put("clientName", item.get("clientName").s());
-        reservation.put("phoneNumber", item.get("phoneNumber").s());
-        reservation.put("date", item.get("date").s());
-        reservation.put("slotTimeStart", item.get("slotTimeStart").s());
-        reservation.put("slotTimeEnd", item.get("slotTimeEnd").s());
-        return reservation;
-    }
-
-    private APIGatewayProxyResponseEvent buildResponse(int statusCode, Map<String, Object> body) {
-        Map<String, String> headers = new HashMap<>();
-        headers.put("Content-Type", "application/json");
-        headers.put("Access-Control-Allow-Origin", "*");
-        headers.put("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-        headers.put("Access-Control-Allow-Headers", "Content-Type,Authorization");
-
-        APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
-        response.setStatusCode(statusCode);
-        response.setHeaders(headers);
-        response.setBody(gson.toJson(body));
-        return response;
-    }
+  }
 }

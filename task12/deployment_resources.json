@@ -39,29 +39,10 @@
     "custom_policies": ["lambda-basic-execution"],
     "resource_type": "iam_role"
   },
-  "api_handler": {
-    "resource_type": "lambda",
-    "deploy_stage": "api",
-    "runtime": "java11",
-    "memory": 512,
-    "timeout": 30,
-    "func_name": "com.task12.ApiHandler::handleRequest",
-    "iam_role_name": "api_handler-role",
-    "deployment_package": "task12-1.0-SNAPSHOT.jar",
-    "dependencies": [
-      {
-        "resource_name": "${booking_userpool}",
-        "resource_type": "cognito_idp"
-      }
-    ],
-    "publish_version": true,
-    "alias": "${lambdas_alias_name}",
-    "event_sources": []
-  },
   "${tables_table}": {
     "resource_type": "dynamodb_table",
     "hash_key_name": "id",
-    "hash_key_type": "N",
+    "hash_key_type": "S",
     "read_capacity": 1,
     "write_capacity": 1
   },
