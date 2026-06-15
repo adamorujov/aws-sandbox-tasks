@@ -1,0 +1,172 @@
+{
+  "lambda-basic-execution": {
+    "policy_content": {
+      "Statement": [
+        {
+          "Action": [
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents",
+            "dynamodb:GetItem",
+            "dynamodb:Query",
+            "dynamodb:PutItem",
+            "dynamodb:Batch*",
+            "dynamodb:DeleteItem",
+            "dynamodb:Scan",
+            "cognito-idp:DescribeUserPool",
+            "cognito-idp:GetUser",
+            "cognito-idp:ListUsers",
+            "cognito-idp:AdminCreateUser",
+            "cognito-idp:AdminInitiateAuth",
+            "cognito-idp:GetIdentityProviderByIdentifier",
+            "cognito-idp:ListUserPools",
+            "cognito-idp:ListUserPoolClients",
+            "cognito-idp:AdminRespondToAuthChallenge",
+            "cognito-idp:AdminConfirmSignUp",
+            "cognito-idp:AdminSetUserPassword"
+          ],
+          "Effect": "Allow",
+          "Resource": "*"
+        }
+      ],
+      "Version": "2012-10-17"
+    },
+    "resource_type": "iam_policy"
+  },
+  "api_handler-role": {
+    "predefined_policies": [],
+    "principal_service": "lambda",
+    "custom_policies": ["lambda-basic-execution"],
+    "resource_type": "iam_role"
+  },
+  "api_handler": {
+    "resource_type": "lambda",
+    "deploy_stage": "api",
+    "runtime": "java11",
+    "memory": 512,
+    "timeout": 30,
+    "func_name": "com.task12.ApiHandler::handleRequest",
+    "iam_role_name": "api_handler-role",
+    "deployment_package": "task12-1.0-SNAPSHOT.jar",
+    "dependencies": [
+      {
+        "resource_name": "${booking_userpool}",
+        "resource_type": "cognito_idp"
+      }
+    ],
+    "publish_version": true,
+    "alias": "${lambdas_alias_name}",
+    "event_sources": []
+  },
+  "${tables_table}": {
+    "resource_type": "dynamodb_table",
+    "hash_key_name": "id",
+    "hash_key_type": "N",
+    "read_capacity": 1,
+    "write_capacity": 1
+  },
+  "${reservations_table}": {
+    "resource_type": "dynamodb_table",
+    "hash_key_name": "id",
+    "hash_key_type": "S",
+    "read_capacity": 1,
+    "write_capacity": 1
+  },
+  "${booking_userpool}": {
+    "resource_type": "cognito_idp",
+    "password_policy": {
+      "minimum_length": 12,
+      "require_uppercase": false,
+      "require_lowercase": false,
+      "require_numbers": false,
+      "require_symbols": false
+    },
+    "auto_verified_attributes": ["email"],
+    "username_attributes": ["email"],
+    "client": {
+      "client_name": "client-app",
+      "generate_secret": false,
+      "explicit_auth_flows": [
+        "ALLOW_ADMIN_USER_PASSWORD_AUTH",
+        "ALLOW_CUSTOM_AUTH",
+        "ALLOW_USER_SRP_AUTH",
+        "ALLOW_REFRESH_TOKEN_AUTH"
+      ]
+    }
+  },
+  "task12_api": {
+    "resource_type": "api_gateway",
+    "deploy_stage": "api",
+    "authorizers": {
+      "authorizer": {
+        "type": "COGNITO_USER_POOLS",
+        "identity_source": "method.request.header.Authorization",
+        "user_pools": ["${booking_userpool}"]
+      }
+    },
+    "resources": {
+      "/signup": {
+        "enable_cors": true,
+        "POST": {
+          "authorization_type": "NONE",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        }
+      },
+      "/signin": {
+        "enable_cors": true,
+        "POST": {
+          "authorization_type": "NONE",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        }
+      },
+      "/tables": {
+        "enable_cors": true,
+        "GET": {
+          "authorization_type": "CUSTOM",
+          "authorizer_name": "authorizer",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        },
+        "POST": {
+          "authorization_type": "CUSTOM",
+          "authorizer_name": "authorizer",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        }
+      },
+      "/tables/{tableId}": {
+        "enable_cors": true,
+        "GET": {
+          "authorization_type": "CUSTOM",
+          "authorizer_name": "authorizer",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        }
+      },
+      "/reservations": {
+        "enable_cors": true,
+        "GET": {
+          "authorization_type": "CUSTOM",
+          "authorizer_name": "authorizer",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        },
+        "POST": {
+          "authorization_type": "CUSTOM",
+          "authorizer_name": "authorizer",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        }
+      }
+    }
+  }
+}
