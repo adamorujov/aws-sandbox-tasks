@@ -84,6 +84,11 @@
   "api-ui-hoster": {
     "resource_type": "s3_bucket",
     "static_website_hosting": true,
+    "website_hosting": {
+      "enabled": true,
+      "index_document": "index.html",
+      "error_document": "error.html"
+    },
     "public_access_block": {
       "block_public_acls": true,
       "ignore_public_acls": true,

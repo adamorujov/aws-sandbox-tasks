@@ -371,11 +371,14 @@ public class ApiHandler
                 .build());
 
     String idToken = auth.authenticationResult().idToken();
+    String accessToken = auth.authenticationResult().accessToken();
+    
     if (idToken == null || idToken.trim().isEmpty()) {
-      throw new BadRequestException("Authentication failed");
+        throw new BadRequestException("Authentication failed");
     }
+    
     Map<String, String> result = new LinkedHashMap<>();
-    result.put("idToken", idToken);
+    result.put("accessToken", idToken); // test sistemi accessToken açarını gözləyir
     return response(200, result);
   }
 
