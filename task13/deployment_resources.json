@@ -81,6 +81,83 @@
       ]
     }
   },
+  "task13_api": {
+    "resource_type": "api_gateway",
+    "deploy_stage": "api",
+    "authorizers": {
+      "authorizer": {
+        "type": "COGNITO_USER_POOLS",
+        "identity_source": "method.request.header.Authorization",
+        "user_pools": [
+          "${booking_userpool}"
+        ]
+      }
+    },
+    "resources": {
+      "/signup": {
+        "enable_cors": true,
+        "POST": {
+          "authorization_type": "NONE",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        }
+      },
+      "/signin": {
+        "enable_cors": true,
+        "POST": {
+          "authorization_type": "NONE",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        }
+      },
+      "/tables": {
+        "enable_cors": true,
+        "GET": {
+          "authorization_type": "authorizer",
+          "authorizer_name": "authorizer",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        },
+        "POST": {
+          "authorization_type": "authorizer",
+          "authorizer_name": "authorizer",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        }
+      },
+      "/tables/{tableId}": {
+        "enable_cors": true,
+        "GET": {
+          "authorization_type": "authorizer",
+          "authorizer_name": "authorizer",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        }
+      },
+      "/reservations": {
+        "enable_cors": true,
+        "GET": {
+          "authorization_type": "authorizer",
+          "authorizer_name": "authorizer",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        },
+        "POST": {
+          "authorization_type": "authorizer",
+          "authorizer_name": "authorizer",
+          "integration_type": "lambda",
+          "lambda_name": "api_handler",
+          "enable_proxy": true
+        }
+      }
+    }
+  },
   "api-ui-hoster": {
     "resource_type": "s3_bucket",
     "static_website_hosting": true,
